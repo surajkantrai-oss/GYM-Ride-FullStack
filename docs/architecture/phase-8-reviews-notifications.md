@@ -1,0 +1,41 @@
+# Phase 8 — Reviews and notifications
+
+Scope: customer reviews after completed use, public ratings, admin moderation, and persistent in-app/push notification delivery. This phase does not implement recommendations, AI moderation, email/SMS, or production store submission.
+
+## Reviews
+
+`Booking.status = COMPLETED` is the sole eligibility rule. The customer API derives the reviewer, gym, and branch from an owned booking; clients cannot supply those identifiers. Review creation locks the booking row, checks eligibility inside the transaction, and writes a review with a unique `booking_id`. A concurrent duplicate receives `REVIEW_ALREADY_EXISTS`; a non-completed booking receives `BOOKING_NOT_ELIGIBLE_FOR_REVIEW`. Ratings are integer 1–5 in request validation and a PostgreSQL check constraint. Optional title/comment are trimmed, whitespace-normalized, length-limited, and rendered as React text (never raw HTML).
+
+Customer routes: `POST/GET/PATCH /api/v1/bookings/:bookingId/review`. Edits may change only rating/title/comment. Removed reviews cannot be edited, and edits never restore a hidden review. The booking detail response includes the customer's review and moderation status so the mobile app can show Leave/View/Edit Review. Review submission creates a single partner notification intent for each authorized owner/manager within the same transaction.
+
+`GET /api/v1/gyms/:gymId/reviews` lists only `PUBLISHED` reviews. It returns a privacy-safe first-name display (no email/phone, internal customer ID, payment, or booking record) with pagination and a database-computed published-only `averageRating`/`reviewCount`. Public gym discovery/detail/nearby responses include those aggregate fields; no reviews means `null` average and count `0`. Branch filtering is supported. Partner `GET /api/v1/partner/reviews[/:id]` is read-only and scoped to owned/managed gyms. Admin `GET /api/v1/admin/reviews[/:id]` and `PATCH /api/v1/admin/reviews/:id/moderation` provide filters and publish/hide/remove actions. Moderation locks the row, requires a reason, preserves original text, and records actor, previous/new state, reason, and time in `AuditLog`. The partner portal displays scoped reviews and aggregates; the admin portal offers audited moderation.
+
+## Notification data and flow
+
+```text
+BookingEvent / financial status / Review creation
+  -> durable database notification intent (unique dedupe key)
+  -> one in-app Notification per recipient
+  -> PushDelivery per enabled device (unique notification/device)
+  -> bounded BullMQ sweep -> PushProvider -> delivery state
+```
+
+Booking events already commit with booking lifecycle changes. `NotificationProjectionService` discovers them after commit, writes notification intents and a per-event `NotificationProjection` marker in one database transaction, and uses row locks/`SKIP LOCKED` to avoid concurrent workers processing the same event. This covers reservation creation, confirmation, check-in availability/verification, completion/review availability, no-show, and cancellation. Payment success/failure, refund success, and paid settlement records use the same per-source projection markers; unlike a timestamp cursor, this remains safe if an older transaction commits late. Historical financial rows are marked projected by the migration baseline so cutover does not create stale notices. Review creation writes partner intents in its own transaction. Push-provider calls occur only after the database commit; provider outage cannot roll back a booking, payment, check-in, refund, settlement, or review.
+
+`Notification` holds one logical user message, safe structured route data, category/type, read timestamp, and a unique dedupe key. `PushDelivery` tracks per-device status (`PENDING`, `PROCESSING`, `SENT`, `FAILED`, `SKIPPED`), attempts, next attempt, failure code, and provider ticket ID. The delivery worker atomically claims due rows. It retries transient errors with exponential backoff for at most five attempts, recovers stale processing claims, and disables an invalid Expo token. A provider acceptance ticket is recorded as sent-to-provider, not proof of delivery to a handset; receipt polling and real-device acceptance remain pending.
+
+The authenticated `GET /api/v1/notifications`, `/unread-count`, `PATCH /:id/read`, and `POST /read-all` routes scope records by the principal's user ID. A partner's notification is private to that partner user; the partner portal does not yet have a notification-center UI. Customer mobile has a paginated Notification Center, unread entry point, refresh/read controls, and foreground cache refresh. Push tap navigation accepts only typed Booking, CheckIn, BookingReview, or Gym routes with UUID identifiers. Authentication restores before the last tapped notification is handled; unavailable or unauthorized destinations fall back to safe app navigation or API error states.
+
+## Devices, preferences, and providers
+
+`POST /api/v1/notifications/devices` registers/rotates an Expo token; `DELETE /devices/:id` disables only the current user's device. The response never includes the raw token. Unique provider/token and notification/device constraints prevent duplicate registrations and fan-out. Devices are bound to the authenticated refresh-session ID. Server logout/logout-all disable devices in the session-revocation transaction, while mobile also attempts deregistration before clearing its local session. If fully offline, local logout still succeeds; a stale server session/device can only be cleared when logout later reaches the server, the token is re-registered, or the provider invalidates it.
+
+`GET/PATCH /api/v1/notifications/preferences` exposes categories. Transactional in-app notices cannot be disabled; transactional push can be. Marketing in-app and push default off, and no marketing campaigns are sent. Mobile asks for push permission from Profile only after the user chooses to enable it. Denial or unavailability does not affect in-app notifications.
+
+`PushProvider` has development and Expo implementations. Development mode records `SKIPPED` rather than pretending to send. Expo mode submits to the Expo Push API and stores a ticket or classified failure without logging tokens. `PUSH_PROVIDER=expo` requires a configured Expo project ID in mobile (`EXPO_PUBLIC_EAS_PROJECT_ID`), native push credentials, and real-device acceptance. `NOTIFICATION_QUEUE_ENABLED=true` uses the existing Redis/BullMQ infrastructure for a 30-second bounded sweep. The read APIs also perform bounded projection catch-up so in-app notices are available in local development without Redis. Do not enable the development push provider outside development/test.
+
+## Validation and operations
+
+Migrations: `20260918000000_reviews_notifications`, `20260918010000_push_session_binding`, `20260918020000_notification_projection_baseline`. Apply all migrations before starting the new backend. Swagger routes use existing bearer-auth and DTO conventions. PostgreSQL runtime tests cover concurrent review uniqueness, moderation/aggregate visibility, booking/payment projection deduplication, notification ownership, and multi-device fan-out. Unit/mobile tests cover service authorization, retry/terminal delivery, permission behavior, safe routes, and screen states.
+
+External acceptance still needed: Expo push on a credentialed physical device, provider receipt handling, and an end-to-end browser/emulator walkthrough with a completed booking. Existing earlier-phase limitations (Razorpay external acceptance, confirmed-booking cancellation, browser QR camera, external Redis timing, and slotless membership check-in) are unchanged.

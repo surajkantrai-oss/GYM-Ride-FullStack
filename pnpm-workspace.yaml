@@ -1,0 +1,26 @@
+packages:
+  - backend
+  - packages/*
+  - frontend/*
+  - mobile-app
+
+patchedDependencies:
+  expo-modules-jsi@57.1.0: patches/expo-modules-jsi@57.1.0.patch
+
+allowBuilds:
+  '@anthropic-ai/claude-code': set this to true or false
+  '@parcel/watcher': false
+  '@prisma/client': true
+  '@prisma/engines': true
+  '@scarf/scarf': false
+  argon2: true
+  esbuild: true
+  msgpackr-extract: false
+  prisma: true
+  unrs-resolver: false
+
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - argon2
+  - prisma

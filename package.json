@@ -1,0 +1,28 @@
+{
+  "name": "gymride",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "build": "pnpm --filter @gymride/backend build && pnpm --filter @gymride/admin-panel build && pnpm --filter @gymride/partner-panel build",
+    "dev": "pnpm --parallel --filter @gymride/backend --filter @gymride/admin-panel --filter @gymride/partner-panel dev",
+    "dev:backend": "pnpm --filter @gymride/backend start:dev",
+    "dev:admin": "pnpm --filter @gymride/admin-panel dev",
+    "dev:partner": "pnpm --filter @gymride/partner-panel dev",
+    "format": "pnpm --filter @gymride/backend format",
+    "format:check": "pnpm -r --if-present format:check",
+    "lint": "pnpm --filter @gymride/backend lint && pnpm --filter @gymride/admin-panel lint && pnpm --filter @gymride/partner-panel lint",
+    "test": "pnpm -r --if-present test",
+    "test:e2e": "pnpm --filter @gymride/backend test:e2e",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "prisma:generate": "pnpm --filter @gymride/backend prisma:generate",
+    "db:migrate": "pnpm --filter @gymride/backend prisma:migrate",
+    "db:seed": "pnpm --filter @gymride/backend prisma:seed"
+  },
+  "devDependencies": {
+    "@anthropic-ai/claude-code": "^2.1.197"
+  }
+}
