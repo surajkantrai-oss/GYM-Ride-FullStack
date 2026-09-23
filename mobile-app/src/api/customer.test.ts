@@ -86,4 +86,22 @@ describe("customer API contract", () => {
     expect(request.mock.calls[0][1]?.method).toBe("PATCH");
     expect(request.mock.calls[1][0]).toBe("/bookings/booking/cancel");
   });
+  it("uses server-authoritative Flex purchase and booking endpoints", async () => {
+    const { api, request } = fixture();
+    await api.purchaseFlex({ planId: "flex-plan", primaryCityId: "city-a", secondaryCityId: "city-b" }, "purchase-key");
+    await api.flexBooking({ branchId: "branch", planId: "gym-plan", slotId: "slot" }, "booking-key");
+    expect(request.mock.calls[0]).toEqual(["/flex/subscriptions", { method: "POST", body: JSON.stringify({ planId: "flex-plan", primaryCityId: "city-a", secondaryCityId: "city-b" }), headers: { "Idempotency-Key": "purchase-key" } }]);
+    expect(request.mock.calls[1]).toEqual(["/flex/bookings", { method: "POST", body: JSON.stringify({ branchId: "branch", planId: "gym-plan", slotId: "slot" }), headers: { "Idempotency-Key": "booking-key" } }]);
+  });
+  it("loads Flex plans, cities, entitlement and server-filtered gyms", async () => {
+    const { api, request } = fixture();
+    await api.flexPlans(); await api.flexCities(); await api.flexSubscription(); await api.flexGyms("city");
+    expect(request.mock.calls.map(([path]) => path)).toEqual(["/flex/plans", "/flex/cities", "/flex/subscription", "/flex/gyms?cityId=city"]);
+  });
+  it("uses authenticated recommendation and owned-preference endpoints", async () => {
+    const { api, request } = fixture();
+    await api.recommendations("city=Pune&limit=5"); await api.gymPreferences(); await api.updateGymPreferences({ preferredRadiusKm: 5 });
+    expect(request.mock.calls.map(([path]) => path)).toEqual(["/recommendations/gyms?city=Pune&limit=5", "/users/me/gym-preferences", "/users/me/gym-preferences"]);
+    expect(request.mock.calls[2][1]?.method).toBe("PATCH");
+  });
 });

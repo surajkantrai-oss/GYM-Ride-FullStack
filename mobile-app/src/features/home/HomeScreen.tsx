@@ -5,6 +5,7 @@ import type { RootStack } from "../../navigation/types";
 import { Button, Card, Copy, Screen, State, Title } from "../../components/ui";
 import { useSession } from "../../store/session";
 import { useDiscoveryLocation } from "../discovery/useLocation";
+import { recommendationReasonLabel } from "../recommendations/reasons";
 export function HomeScreen() {
   const { api, user } = useSession();
   const navigation = useNavigation<NativeStackNavigationProp<RootStack>>();
@@ -26,6 +27,10 @@ export function HomeScreen() {
     queryKey: ["home-gyms"],
     queryFn: () => api.gyms("page=1&limit=5"),
   });
+  const recommendations = useQuery({
+    queryKey: ["recommendations", "home", location.coordinates],
+    queryFn: () => api.recommendations(new URLSearchParams({ ...(location.coordinates && { latitude: String(location.coordinates.latitude), longitude: String(location.coordinates.longitude) }), radiusKm: "10", page: "1", limit: "5" }).toString()),
+  });
   const bookings = useQuery({
     queryKey: ["bookings", 1],
     queryFn: () => api.bookings(1),
@@ -36,6 +41,8 @@ export function HomeScreen() {
       <Copy>Welcome, {user?.firstName || "athlete"}</Copy>
       <Title>A good day starts with a workout.</Title>
       <Button label={`Notifications${unread.data?.count ? ` (${unread.data.count} unread)` : ""}`} onPress={() => navigation.navigate("Notifications")} />
+      <Button label="GYMRide Flex" onPress={() => navigation.navigate("Flex")} />
+      <Button label="Recommendation preferences" onPress={() => navigation.navigate("GymPreferences")} />
       <Copy>
         Explore gyms and choose the branch and plan that suit you. Use Explore
         for nearby or city search.
@@ -82,6 +89,14 @@ export function HomeScreen() {
           ))}
         </>
       )}
+      <Title>Recommended for You</Title>
+      <State loading={recommendations.isLoading} error={recommendations.error} empty={recommendations.data?.data.length === 0} retry={() => void recommendations.refetch()} />
+      {recommendations.data?.data.map((item) => <Card key={item.branch.id}>
+        <Title>{item.gym.name}</Title><Copy>{item.branch.name} · {item.branch.city}{item.distanceMeters == null ? "" : ` · ${(item.distanceMeters / 1000).toFixed(1)} km`}</Copy>
+        <Copy>{item.reasons.map((reason) => recommendationReasonLabel[reason]).join(" · ") || "Recommended from current availability"}</Copy>
+        <Copy>From ₹{(item.startingPriceMinor / 100).toFixed(0)} · Score {item.score}/100</Copy>
+        <Button label={`View ${item.gym.name}`} onPress={() => navigation.navigate("Gym", { gymId: item.gym.id })} />
+      </Card>)}
       <Title>Your bookings</Title>
       <State
         loading={bookings.isLoading}

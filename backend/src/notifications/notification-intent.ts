@@ -5,6 +5,7 @@ export type NotificationRoute =
   | { screen: 'CheckIn'; bookingId: string }
   | { screen: 'BookingReview'; bookingId: string }
   | { screen: 'Gym'; gymId: string }
+  | { screen: 'Flex' }
   | { screen: 'PartnerReviews'; gymId: string }
   | { screen: 'PartnerSettlement'; settlementId: string };
 

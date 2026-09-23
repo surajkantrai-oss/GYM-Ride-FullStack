@@ -60,5 +60,6 @@ import { CheckInsModule } from '../check-ins/check-ins.module';
       },
     },
   ],
+  exports: [PaymentProvider],
 })
 export class FinanceModule {}

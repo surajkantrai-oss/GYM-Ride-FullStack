@@ -16,7 +16,9 @@ export function ReviewScreen({
   const key = useMemo(() => randomUUID(), [branch.id, plan.id, slot?.id]);
   const reserve = useMutation({
     mutationFn: () =>
-      api.reserve(
+      route.params.flexMode ? api.flexBooking(
+        { branchId: branch.id, planId: plan.id, slotId: slot!.id }, key,
+      ) : api.reserve(
         {
           branchId: branch.id,
           planId: plan.id,
@@ -26,7 +28,7 @@ export function ReviewScreen({
       ),
     onSuccess: async (booking) => {
       await cache.invalidateQueries({ queryKey: ["bookings"] });
-      navigation.replace("Payment", { bookingId: booking.id });
+      navigation.replace(route.params.flexMode ? "Booking" : "Payment", { bookingId: booking.id });
     },
   });
   return (
@@ -42,10 +44,9 @@ export function ReviewScreen({
           {slotTime(slot.endAt, branch.timezone)}
         </Copy>
       )}
-      <Title>{money(plan.priceMinor, plan.currency)}</Title>
+      <Title>{route.params.flexMode ? "Covered by Flex" : money(plan.priceMinor, plan.currency)}</Title>
       <Copy>
-        Price and availability will be validated by the server. Your place is
-        confirmed only after payment verification.
+        {route.params.flexMode ? "Eligibility, usage limits, and reimbursement are validated by the server." : "Price and availability will be validated by the server. Your place is confirmed only after payment verification."}
       </Copy>
       <State loading={reserve.isPending} error={reserve.error} />
       <Button

@@ -15,6 +15,13 @@ import type {
   PublicGym,
   SlotAvailability,
   UserProfile,
+  ServiceCity,
+  FlexPlan,
+  FlexCheckout,
+  FlexSubscription,
+  FlexEligibleGym,
+  RecommendationResponse,
+  CustomerGymPreference,
 } from "@gymride/types";
 import type { MobileApiClient } from "./client";
 export interface ReservationInput {
@@ -54,6 +61,9 @@ export function customerApi(client: MobileApiClient) {
       client.request<PaginatedResponse<PublicGym>>(`/gyms?${query}`),
     nearby: (query: string) =>
       client.request<NearbyGymsResponse>(`/gyms/nearby?${query}`),
+    recommendations: (query: string) => client.request<RecommendationResponse>(`/recommendations/gyms?${query}`),
+    gymPreferences: () => client.request<CustomerGymPreference | null>("/users/me/gym-preferences"),
+    updateGymPreferences: (input: Partial<CustomerGymPreference>) => client.request<CustomerGymPreference>("/users/me/gym-preferences", { method: "PATCH", body: JSON.stringify(input) }),
     gym: (id: string) =>
       client.request<PublicGym>(`/gyms/${encodeURIComponent(id)}`),
     gymReviews: (id: string, page = 1, branchId?: string) =>
@@ -125,6 +135,13 @@ export function customerApi(client: MobileApiClient) {
         `/payments/${encodeURIComponent(paymentId)}/verify`,
         post(proof),
       ),
+    flexCities: () => client.request<ServiceCity[]>("/flex/cities"),
+    flexPlans: () => client.request<FlexPlan[]>("/flex/plans"),
+    flexSubscription: () => client.request<FlexSubscription | null>("/flex/subscription"),
+    flexGyms: (cityId?: string) => client.request<FlexEligibleGym[]>(`/flex/gyms${cityId ? `?cityId=${encodeURIComponent(cityId)}` : ""}`),
+    purchaseFlex: (input: { planId: string; primaryCityId: string; secondaryCityId?: string }, key: string) => client.request<FlexCheckout>("/flex/subscriptions", { ...post(input), headers: { "Idempotency-Key": key } }),
+    simulateFlexPayment: (paymentId: string) => client.request<FlexSubscription>(`/flex/payments/${encodeURIComponent(paymentId)}/simulate`, post({})),
+    flexBooking: (input: { branchId: string; planId: string; slotId: string }, key: string) => client.request<Booking>("/flex/bookings", { ...post(input), headers: { "Idempotency-Key": key } }),
   };
 }
 export type CustomerApi = ReturnType<typeof customerApi>;

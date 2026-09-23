@@ -203,7 +203,15 @@ export class PaymentsService {
       });
       const snapshot = this.commission.calculate(payment.amount);
       await tx.gymEarning.create({
-        data: { paymentId, grossAmount: payment.amount, currency: payment.currency, ...snapshot },
+        data: {
+          paymentId,
+          gymId: booking.gymId,
+          branchId: booking.branchId,
+          source: 'STANDARD_PAYMENT',
+          grossAmount: payment.amount,
+          currency: payment.currency,
+          ...snapshot,
+        },
       });
       await tx.financialLedgerEntry.createMany({
         data: [

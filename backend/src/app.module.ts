@@ -25,6 +25,8 @@ import { FinanceModule } from './finance/finance.module';
 import { CheckInsModule } from './check-ins/check-ins.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { FlexModule } from './flex/flex.module';
+import { RecommendationModule } from './recommendations/recommendation.module';
 
 @Module({
   imports: [
@@ -83,6 +85,8 @@ import { NotificationsModule } from './notifications/notifications.module';
     FinanceModule,
     ReviewsModule,
     NotificationsModule,
+    FlexModule,
+    RecommendationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

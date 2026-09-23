@@ -8,6 +8,7 @@ describe("safe notification routes", () => {
   });
   it("accepts gym navigation but not arbitrary URLs or route names", () => {
     expect(safeNotificationRoute({ screen: "Gym", gymId: bookingId })).toEqual({ screen: "Gym", gymId: bookingId });
+    expect(safeNotificationRoute({ screen: "Flex" })).toEqual({ screen: "Flex" });
     expect(safeNotificationRoute({ screen: "https://evil.invalid", bookingId })).toBeNull();
     expect(safeNotificationRoute({ screen: "Booking", bookingId: "../admin" })).toBeNull();
     expect(safeNotificationRoute({ screen: "PartnerSettlement", settlementId: bookingId })).toBeNull();

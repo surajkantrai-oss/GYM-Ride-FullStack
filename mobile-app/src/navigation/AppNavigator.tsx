@@ -21,6 +21,8 @@ import { CheckInScreen } from "../features/check-in/CheckInScreen";
 import { BookingReviewScreen } from "../features/reviews/BookingReviewScreen";
 import { GymReviewsScreen } from "../features/reviews/GymReviewsScreen";
 import { NotificationsScreen } from "../features/notifications/NotificationsScreen";
+import { FlexScreen } from "../features/flex/FlexScreen";
+import { PreferencesScreen } from "../features/recommendations/PreferencesScreen";
 import { safeNotificationRoute } from "../features/notifications/routing";
 const Stack = createNativeStackNavigator<RootStack>();
 const Tabs = createBottomTabNavigator();
@@ -32,6 +34,7 @@ function openPushData(data: unknown) {
   else if (route?.screen === "CheckIn") navigationRef.navigate("CheckIn", { bookingId: route.bookingId });
   else if (route?.screen === "BookingReview") navigationRef.navigate("BookingReview", { bookingId: route.bookingId });
   else if (route?.screen === "Gym") navigationRef.navigate("Gym", { gymId: route.gymId });
+  else if (route?.screen === "Flex") navigationRef.navigate("Flex");
   else navigationRef.navigate("Notifications");
 }
 function MainTabs() {
@@ -99,6 +102,8 @@ export function AppNavigator() {
         <Stack.Screen name="BookingReview" component={BookingReviewScreen} options={{ title: "Review your visit" }} />
         <Stack.Screen name="GymReviews" component={GymReviewsScreen} options={{ title: "Gym reviews" }} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="Flex" component={FlexScreen} options={{ title: "GYMRide Flex" }} />
+        <Stack.Screen name="GymPreferences" component={PreferencesScreen} options={{ title: "Recommendation preferences" }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

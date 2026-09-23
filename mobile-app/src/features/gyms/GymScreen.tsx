@@ -25,6 +25,10 @@ export function GymScreen({
     queryFn: () => api.plans(branchId!),
   });
   const branch = gym.data?.branches.find((b) => b.id === branchId);
+  const flexMode = route.params.flexMode === true;
+  const visibleBranches = flexMode && route.params.flexBranchId
+    ? gym.data?.branches.filter((b) => b.id === route.params.flexBranchId)
+    : gym.data?.branches;
   return (
     <Screen>
       <State
@@ -46,7 +50,8 @@ export function GymScreen({
           </Card>)}
           <Button label="See all reviews" onPress={() => navigation.navigate("GymReviews", { gymId: route.params.gymId })} />
           <Title>Choose a branch</Title>
-          {gym.data.branches.map((b) => (
+          {flexMode && <Copy>Flex booking · your visit is covered by your active subscription.</Copy>}
+          {visibleBranches?.map((b) => (
             <Button
               key={b.id}
               label={`${branchId === b.id ? "Selected: " : ""}${b.name} · ${b.city}`}
@@ -100,6 +105,7 @@ export function GymScreen({
                           gym: gym.data!,
                           branch,
                           plan,
+                          flexMode,
                         })
                       }
                     />

@@ -123,6 +123,36 @@ export interface BackendErrorBody {
 }
 
 export type PlanType = "DAY_PASS" | "MONTHLY" | "QUARTERLY" | "YEARLY";
+export type RecommendationReason = "NEAR_YOU" | "HIGHLY_RATED" | "MATCHES_AMENITIES" | "FITS_BUDGET" | "AVAILABLE_AT_PREFERRED_TIME" | "FLEX_ELIGIBLE" | "PREVIOUSLY_VISITED" | "POPULAR_WITH_CUSTOMERS";
+export interface GymRecommendation {
+  gym: { id: string; name: string };
+  branch: { id: string; name: string; city: string; latitude: number; longitude: number };
+  distanceMeters: number | null;
+  averageRating: number | null;
+  reviewCount: number;
+  startingPriceMinor: number;
+  currency: string;
+  planTypes: PlanType[];
+  amenities: string[];
+  flexEligible: boolean;
+  availability: { availableSlots: number; openAtDesiredTime: boolean | null };
+  score: number;
+  reasons: RecommendationReason[];
+}
+export interface RecommendationResponse extends PaginatedResponse<GymRecommendation> {
+  context: { personalized: boolean; locationUsed: boolean; city: string | null; radiusKm: number };
+}
+export interface CustomerGymPreference {
+  id?: string;
+  userId?: string;
+  preferredAmenities: string[];
+  preferredPlanType: PlanType | null;
+  preferredWorkoutHour: number | null;
+  preferredRadiusKm: number;
+  preferredBudgetMinMinor: number | null;
+  preferredBudgetMaxMinor: number | null;
+  version?: number;
+}
 export type PlanStatus = "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED";
 export type SlotStatus = "AVAILABLE" | "BLOCKED" | "CLOSED";
 export type BookingStatus =
@@ -240,6 +270,10 @@ export interface Booking {
   completedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  source?: "STANDARD_PLAN" | "FLEX";
+  customerChargeMinor?: number | null;
+  reimbursementMinor?: number | null;
+  flexSubscriptionId?: string | null;
   user: Pick<UserProfile, "id" | "firstName" | "lastName">;
   gym: { id: string; name: string };
   branch: { id: string; name: string; city: string; timezone?: string };
@@ -321,6 +355,7 @@ export interface GymReviewPage extends PaginatedResponse<GymReview> {
 export type NotificationRoute =
   | { screen: 'Booking' | 'CheckIn' | 'BookingReview'; bookingId: string }
   | { screen: 'Gym' | 'PartnerReviews'; gymId: string }
+  | { screen: 'Flex' }
   | { screen: 'PartnerSettlement'; settlementId: string };
 export interface InAppNotification {
   id: string;
@@ -333,10 +368,16 @@ export interface InAppNotification {
   createdAt: string;
 }
 export interface NotificationPreference {
-  category: 'BOOKING' | 'PAYMENT' | 'CHECK_IN' | 'REFUND' | 'REVIEW' | 'SETTLEMENT' | 'MARKETING';
+  category: 'BOOKING' | 'PAYMENT' | 'CHECK_IN' | 'REFUND' | 'REVIEW' | 'SETTLEMENT' | 'MARKETING' | 'FLEX';
   inAppEnabled: boolean;
   pushEnabled: boolean;
 }
+
+export interface ServiceCity { id: string; code: string; name: string; state: string; country: string; active: boolean }
+export interface FlexPlan { id: string; name: string; code: string; description?: string | null; priceMinor: number; currency: string; durationDays: number; totalUsageLimit: number; primaryCityLimit: number; secondaryCityLimit: number; dailyUsageLimit: number; bookingAdvanceDays: number; status: string }
+export interface FlexCheckout { subscriptionId: string; paymentId: string; provider: string; orderId: string; amount: number; currency: string; status: string; simulated: boolean; keyId?: string }
+export interface FlexSubscription { id: string; status: string; planName: string; priceMinor: number; currency: string; totalUsageLimit: number; primaryCityLimit: number; secondaryCityLimit: number; startedAt?: string | null; expiresAt?: string | null; primaryCity: ServiceCity; secondaryCity?: ServiceCity | null; payment?: { id: string; status: string } | null; periods: Array<{ id: string; totalLimit: number; primaryCityLimit: number; secondaryCityLimit: number; startsAt: string; endsAt: string }> }
+export interface FlexEligibleGym { id: string; gym: { id: string; name: string }; branch: { id: string; name: string; address: string; city: string; timezone: string }; serviceCity: ServiceCity }
 export interface NearbyGymsResponse {
   data: NearbyGym[];
   meta: { page: number; limit: number; hasMore: boolean };

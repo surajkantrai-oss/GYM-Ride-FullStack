@@ -11,10 +11,12 @@ import { ApiErrorCode } from '../common/errors/api-error-code';
 import { DomainException } from '../common/errors/domain.exception';
 import { PrismaService } from '../database/prisma.service';
 import { CheckInPolicy, CheckInWindow } from './check-in.policy';
+import { createNotificationIntent } from '../notifications/notification-intent';
 
 export const checkInBookingInclude = {
   slot: true,
   payment: true,
+  flexUsage: true,
   checkIn: true,
   gym: { select: { id: true, name: true } },
   branch: { select: { id: true, name: true, city: true, timezone: true } },
@@ -160,6 +162,28 @@ export class CheckInService {
         metadata: { method, checkInId },
       },
     });
+    if (booking.source === 'FLEX') {
+      const usage = await tx.flexUsage.findUnique({ where: { bookingId: booking.id } });
+      if (!usage || usage.status !== 'RESERVED')
+        this.fail(ApiErrorCode.FLEX_USAGE_ALREADY_CONSUMED, 'Flex usage is not reserved', HttpStatus.CONFLICT);
+      await tx.flexUsage.update({ where: { id: usage.id }, data: { status: 'CONSUMED', consumedAt: now } });
+      await tx.gymEarning.create({ data: {
+        flexUsageId: usage.id, source: 'FLEX_USAGE', gymId: usage.gymId, branchId: usage.branchId,
+        grossAmount: usage.reimbursementMinor, commissionAmount: 0, commissionBps: 0,
+        commissionVersion: usage.reimbursementVersion, netAmount: usage.reimbursementMinor,
+        currency: usage.reimbursementCurrency,
+      } });
+      await tx.financialLedgerEntry.create({ data: {
+        sourceId: usage.id, sourceType: 'FLEX_USAGE', gymId: usage.gymId, branchId: usage.branchId,
+        category: 'FLEX_REIMBURSEMENT', account: 'gym_payable', amount: usage.reimbursementMinor,
+        currency: usage.reimbursementCurrency,
+      } });
+      await createNotificationIntent(tx, {
+        userId: booking.userId, type: 'FLEX_USAGE_RECORDED', category: 'FLEX',
+        title: 'Flex visit recorded', body: `Your visit to ${booking.gym.name} used one Flex credit.`,
+        route: { screen: 'Booking', bookingId: booking.id }, dedupeKey: `flex-usage:${usage.id}:consumed`,
+      });
+    }
   }
 
   async verificationView(bookingId: string): Promise<unknown> {
@@ -250,6 +274,8 @@ export class CheckInService {
             metadata: { noShowAt: window.noShowAt.toISOString() },
           },
         });
+        if (booking.source === 'FLEX')
+          await tx.flexUsage.updateMany({ where: { bookingId, status: 'RESERVED' }, data: { status: 'FORFEITED', consumedAt: now } });
         didChange = true;
       } else if (status === BookingStatus.CHECKED_IN && now >= window.completesAt) {
         await tx.booking.update({
@@ -342,6 +368,14 @@ export class CheckInService {
   }
 
   private hasFinancialIntegrity(booking: CheckInBooking): boolean {
+    if (booking.source === 'FLEX')
+      return !!(
+        booking.flexSubscriptionId &&
+        booking.flexUsage?.status === 'RESERVED' &&
+        booking.customerChargeMinor === 0 &&
+        booking.reimbursementMinor === booking.flexUsage.reimbursementMinor &&
+        booking.reimbursementCurrency === booking.flexUsage.reimbursementCurrency
+      );
     const payment = booking.payment;
     return !!(
       payment?.capturedAt &&

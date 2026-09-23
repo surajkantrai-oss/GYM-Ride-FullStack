@@ -89,7 +89,11 @@ export class FinanceQueriesService {
         if (q.status && !['PAID', 'PENDING'].includes(q.status))
           financeError(E.VALIDATION_FAILED, 'Earnings status must be PAID or PENDING', 400);
         const where: Prisma.GymEarningWhereInput = {
-          payment: { booking },
+          gymId: q.gymId,
+          branchId: q.branchId,
+          ...(q.bookingId
+            ? { OR: [{ payment: { bookingId: q.bookingId } }, { flexUsage: { bookingId: q.bookingId } }] }
+            : {}),
           createdAt,
           ...(q.status === 'PAID'
             ? { settled: true }
@@ -169,23 +173,32 @@ export class FinanceQueriesService {
     if (resource === 'earnings') {
       const item = await this.prisma.gymEarning.findUnique({
         where: { id },
-        include: { payment: { include: { booking: true } }, settlementItem: true },
+        include: {
+          payment: { include: { booking: true } },
+          flexUsage: { include: { booking: true } },
+          settlementItem: true,
+        },
       });
       if (!item) financeError(E.NOT_FOUND, 'Earning not found', 404);
-      if (user) await this.access.assertBranchManagement(user, item.payment.booking.branchId);
-      const { payment, ...safe } = item;
+      if (user) {
+        if (item.branchId) await this.access.assertBranchManagement(user, item.branchId);
+        else await this.access.assertGymManagement(user, item.gymId);
+      }
+      const { payment, flexUsage, ...safe } = item;
+      const sourceBooking = payment?.booking ?? flexUsage?.booking;
       return {
         ...safe,
-        bookingId: payment.bookingId,
-        gymId: payment.booking.gymId,
-        branchId: payment.booking.branchId,
+        paymentId: payment?.id ?? null,
+        flexUsageId: flexUsage?.id ?? null,
+        bookingId: sourceBooking?.id ?? null,
       };
     }
     financeError(E.NOT_FOUND, 'Detail resource not supported', 404);
   }
   async summary(q: FinanceQueryDto): Promise<unknown> {
     const where: Prisma.GymEarningWhereInput = {
-      payment: { booking: { gymId: q.gymId, branchId: q.branchId } },
+      gymId: q.gymId,
+      branchId: q.branchId,
       createdAt: this.dates(q),
     };
     const [all, paid, pending, statuses] = await Promise.all([

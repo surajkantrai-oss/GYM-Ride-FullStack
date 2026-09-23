@@ -74,6 +74,10 @@ enum AuditAction {
   GYM_SUSPENDED
   GYM_REACTIVATED
   ROLE_CHANGED
+  FLEX_PLAN_CHANGED
+  FLEX_PARTICIPATION_CHANGED
+  FLEX_SUBSCRIPTION_ADJUSTED
+  FLEX_REIMBURSEMENT_CHANGED
 }
 
 enum PlanType {
@@ -164,6 +168,10 @@ enum NotificationType {
   REVIEW_AVAILABLE
   REVIEW_RECEIVED
   SETTLEMENT_PAID
+  FLEX_SUBSCRIPTION_ACTIVATED
+  FLEX_USAGE_RECORDED
+  FLEX_USAGE_LIMIT_REACHED
+  FLEX_SUBSCRIPTION_EXPIRED
 }
 
 enum NotificationCategory {
@@ -174,6 +182,53 @@ enum NotificationCategory {
   REVIEW
   SETTLEMENT
   MARKETING
+  FLEX
+}
+
+enum FlexPlanStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum FlexSubscriptionStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  SUSPENDED
+}
+
+enum FlexUsagePeriodStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum FlexUsageStatus {
+  RESERVED
+  CONSUMED
+  RELEASED
+  FORFEITED
+}
+
+enum FlexPaymentStatus {
+  CREATED
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum BookingSource {
+  STANDARD_PLAN
+  FLEX
+}
+
+enum EarningSource {
+  STANDARD_PAYMENT
+  FLEX_USAGE
 }
 
 enum PushDeliveryStatus {
@@ -208,8 +263,32 @@ model User {
   notifications           Notification[]
   pushDevices             PushDevice[]
   notificationPreferences NotificationPreference[]
+  primaryFlexCity         ServiceCity?             @relation("UserPrimaryFlexCity", fields: [primaryFlexCityId], references: [id], onDelete: SetNull)
+  secondaryFlexCity       ServiceCity?             @relation("UserSecondaryFlexCity", fields: [secondaryFlexCityId], references: [id], onDelete: SetNull)
+  primaryFlexCityId       String?                  @map("primary_flex_city_id") @db.Uuid
+  secondaryFlexCityId     String?                  @map("secondary_flex_city_id") @db.Uuid
+  flexSubscriptions       FlexSubscription[]
+  flexUsages              FlexUsage[]
+  gymPreference           CustomerGymPreference?
 
   @@map("users")
+}
+
+model CustomerGymPreference {
+  id                      String    @id @default(uuid()) @db.Uuid
+  userId                  String    @unique @map("user_id") @db.Uuid
+  preferredAmenities      String[]  @default([]) @map("preferred_amenities")
+  preferredPlanType       PlanType? @map("preferred_plan_type")
+  preferredWorkoutHour    Int?      @map("preferred_workout_hour") @db.SmallInt
+  preferredRadiusKm       Int       @default(10) @map("preferred_radius_km") @db.SmallInt
+  preferredBudgetMinMinor Int?      @map("preferred_budget_min_minor")
+  preferredBudgetMaxMinor Int?      @map("preferred_budget_max_minor")
+  version                 Int       @default(1)
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("customer_gym_preferences")
 }
 
 model Role {
@@ -236,23 +315,25 @@ model UserRole {
 }
 
 model Gym {
-  id           String          @id @default(uuid()) @db.Uuid
-  name         String          @db.VarChar(160)
-  description  String?         @db.Text
-  ownerId      String          @map("owner_id") @db.Uuid
-  status       GymStatus       @default(DRAFT)
-  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
-  statusReason String?         @map("status_reason") @db.VarChar(1000)
-  submittedAt  DateTime?       @map("submitted_at") @db.Timestamptz(6)
-  reviewedAt   DateTime?       @map("reviewed_at") @db.Timestamptz(6)
-  owner        User            @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  branches     GymBranch[]
-  memberships  GymMembership[]
-  plans        GymPlan[]
-  bookings     Booking[]
-  checkIns     CheckIn[]
-  reviews      Review[]
+  id                 String                 @id @default(uuid()) @db.Uuid
+  name               String                 @db.VarChar(160)
+  description        String?                @db.Text
+  ownerId            String                 @map("owner_id") @db.Uuid
+  status             GymStatus              @default(DRAFT)
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  statusReason       String?                @map("status_reason") @db.VarChar(1000)
+  submittedAt        DateTime?              @map("submitted_at") @db.Timestamptz(6)
+  reviewedAt         DateTime?              @map("reviewed_at") @db.Timestamptz(6)
+  owner              User                   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  branches           GymBranch[]
+  memberships        GymMembership[]
+  plans              GymPlan[]
+  bookings           Booking[]
+  checkIns           CheckIn[]
+  reviews            Review[]
+  flexParticipations GymFlexParticipation[]
+  flexUsages         FlexUsage[]
 
   @@index([ownerId])
   @@index([status])
@@ -260,34 +341,36 @@ model Gym {
 }
 
 model GymBranch {
-  id             String                                 @id @default(uuid()) @db.Uuid
-  gymId          String                                 @map("gym_id") @db.Uuid
-  name           String                                 @db.VarChar(160)
-  address        String                                 @db.VarChar(255)
-  city           String                                 @db.VarChar(120)
-  state          String                                 @db.VarChar(120)
-  postalCode     String                                 @map("postal_code") @db.VarChar(20)
-  country        String                                 @default("IN") @db.VarChar(2)
-  latitude       Decimal                                @db.Decimal(9, 6)
-  longitude      Decimal                                @db.Decimal(9, 6)
-  location       Unsupported("geography(Point, 4326)")?
-  phone          String?                                @db.VarChar(32)
-  email          String?                                @db.VarChar(320)
-  timezone       String                                 @default("Asia/Kolkata") @db.VarChar(64)
-  status         BranchStatus                           @default(DRAFT)
-  createdAt      DateTime                               @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime                               @updatedAt @map("updated_at") @db.Timestamptz(6)
-  gym            Gym                                    @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  amenities      BranchAmenity[]
-  operatingHours OperatingHours[]
-  memberships    GymMembership[]
-  planLinks      PlanBranch[]
-  slotConfig     BranchSlotConfig?
-  slots          SlotInstance[]
-  exceptions     BranchAvailabilityException[]
-  bookings       Booking[]
-  checkIns       CheckIn[]
-  reviews        Review[]
+  id                 String                                 @id @default(uuid()) @db.Uuid
+  gymId              String                                 @map("gym_id") @db.Uuid
+  name               String                                 @db.VarChar(160)
+  address            String                                 @db.VarChar(255)
+  city               String                                 @db.VarChar(120)
+  state              String                                 @db.VarChar(120)
+  postalCode         String                                 @map("postal_code") @db.VarChar(20)
+  country            String                                 @default("IN") @db.VarChar(2)
+  latitude           Decimal                                @db.Decimal(9, 6)
+  longitude          Decimal                                @db.Decimal(9, 6)
+  location           Unsupported("geography(Point, 4326)")?
+  phone              String?                                @db.VarChar(32)
+  email              String?                                @db.VarChar(320)
+  timezone           String                                 @default("Asia/Kolkata") @db.VarChar(64)
+  status             BranchStatus                           @default(DRAFT)
+  createdAt          DateTime                               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gym                Gym                                    @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  amenities          BranchAmenity[]
+  operatingHours     OperatingHours[]
+  memberships        GymMembership[]
+  planLinks          PlanBranch[]
+  slotConfig         BranchSlotConfig?
+  slots              SlotInstance[]
+  exceptions         BranchAvailabilityException[]
+  bookings           Booking[]
+  checkIns           CheckIn[]
+  reviews            Review[]
+  flexParticipations GymFlexParticipation[]
+  flexUsages         FlexUsage[]
 
   @@unique([gymId, name])
   @@index([gymId])
@@ -469,33 +552,44 @@ model BranchAvailabilityException {
 }
 
 model Booking {
-  payment              Payment?
-  id                   String         @id @default(uuid()) @db.Uuid
-  userId               String         @map("user_id") @db.Uuid
-  gymId                String         @map("gym_id") @db.Uuid
-  branchId             String         @map("branch_id") @db.Uuid
-  planId               String         @map("plan_id") @db.Uuid
-  slotId               String?        @map("slot_id") @db.Uuid
-  status               BookingStatus  @default(CREATED)
-  planName             String         @map("plan_name") @db.VarChar(160)
-  planType             PlanType       @map("plan_type")
-  priceMinor           Int            @map("price_minor")
-  currency             String         @db.Char(3)
-  idempotencyKey       String         @map("idempotency_key") @db.VarChar(120)
-  requestFingerprint   String         @map("request_fingerprint") @db.Char(64)
-  reservationExpiresAt DateTime?      @map("reservation_expires_at") @db.Timestamptz(6)
-  cancelledAt          DateTime?      @map("cancelled_at") @db.Timestamptz(6)
-  completedAt          DateTime?      @map("completed_at") @db.Timestamptz(6)
-  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
-  user                 User           @relation(fields: [userId], references: [id], onDelete: Restrict)
-  gym                  Gym            @relation(fields: [gymId], references: [id], onDelete: Restrict)
-  branch               GymBranch      @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  plan                 GymPlan        @relation(fields: [planId], references: [id], onDelete: Restrict)
-  slot                 SlotInstance?  @relation(fields: [slotId], references: [id], onDelete: Restrict)
-  events               BookingEvent[]
-  checkIn              CheckIn?
-  review               Review?
+  payment               Payment?
+  id                    String            @id @default(uuid()) @db.Uuid
+  userId                String            @map("user_id") @db.Uuid
+  gymId                 String            @map("gym_id") @db.Uuid
+  branchId              String            @map("branch_id") @db.Uuid
+  planId                String            @map("plan_id") @db.Uuid
+  slotId                String?           @map("slot_id") @db.Uuid
+  status                BookingStatus     @default(CREATED)
+  planName              String            @map("plan_name") @db.VarChar(160)
+  planType              PlanType          @map("plan_type")
+  priceMinor            Int               @map("price_minor")
+  currency              String            @db.Char(3)
+  idempotencyKey        String            @map("idempotency_key") @db.VarChar(120)
+  requestFingerprint    String            @map("request_fingerprint") @db.Char(64)
+  reservationExpiresAt  DateTime?         @map("reservation_expires_at") @db.Timestamptz(6)
+  cancelledAt           DateTime?         @map("cancelled_at") @db.Timestamptz(6)
+  completedAt           DateTime?         @map("completed_at") @db.Timestamptz(6)
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  gym                   Gym               @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  branch                GymBranch         @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  plan                  GymPlan           @relation(fields: [planId], references: [id], onDelete: Restrict)
+  slot                  SlotInstance?     @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  events                BookingEvent[]
+  checkIn               CheckIn?
+  review                Review?
+  source                BookingSource     @default(STANDARD_PLAN)
+  flexSubscriptionId    String?           @map("flex_subscription_id") @db.Uuid
+  flexUsagePeriodId     String?           @map("flex_usage_period_id") @db.Uuid
+  flexCityId            String?           @map("flex_city_id") @db.Uuid
+  customerChargeMinor   Int?              @map("customer_charge_minor")
+  reimbursementMinor    Int?              @map("reimbursement_minor")
+  reimbursementCurrency String?           @map("reimbursement_currency") @db.Char(3)
+  flexSubscription      FlexSubscription? @relation(fields: [flexSubscriptionId], references: [id], onDelete: Restrict)
+  flexUsagePeriod       FlexUsagePeriod?  @relation(fields: [flexUsagePeriodId], references: [id], onDelete: Restrict)
+  flexCity              ServiceCity?      @relation(fields: [flexCityId], references: [id], onDelete: Restrict)
+  flexUsage             FlexUsage?
 
   @@unique([userId, idempotencyKey])
   @@index([userId, createdAt])
@@ -503,7 +597,207 @@ model Booking {
   @@index([gymId, status, createdAt])
   @@index([slotId, status])
   @@index([reservationExpiresAt, status])
+  @@index([flexSubscriptionId, status])
+  @@index([flexUsagePeriodId, status])
   @@map("bookings")
+}
+
+model ServiceCity {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  code                   String                 @unique @db.VarChar(80)
+  name                   String                 @db.VarChar(120)
+  state                  String                 @db.VarChar(120)
+  country                String                 @default("IN") @db.Char(2)
+  active                 Boolean                @default(true)
+  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  primaryUsers           User[]                 @relation("UserPrimaryFlexCity")
+  secondaryUsers         User[]                 @relation("UserSecondaryFlexCity")
+  primarySubscriptions   FlexSubscription[]     @relation("FlexPrimaryCity")
+  secondarySubscriptions FlexSubscription[]     @relation("FlexSecondaryCity")
+  participations         GymFlexParticipation[]
+  usages                 FlexUsage[]
+  bookings               Booking[]
+
+  @@unique([name, state, country])
+  @@index([active, name])
+  @@map("service_cities")
+}
+
+model FlexPlan {
+  id                 String             @id @default(uuid()) @db.Uuid
+  name               String             @db.VarChar(160)
+  code               String             @unique @db.VarChar(80)
+  description        String?            @db.Text
+  status             FlexPlanStatus     @default(DRAFT)
+  priceMinor         Int                @map("price_minor")
+  currency           String             @default("INR") @db.Char(3)
+  durationDays       Int                @map("duration_days")
+  totalUsageLimit    Int                @map("total_usage_limit")
+  primaryCityLimit   Int                @map("primary_city_limit")
+  secondaryCityLimit Int                @map("secondary_city_limit")
+  dailyUsageLimit    Int                @default(1) @map("daily_usage_limit")
+  bookingAdvanceDays Int                @default(14) @map("booking_advance_days")
+  eligiblePlanTypes  PlanType[]         @default([DAY_PASS]) @map("eligible_plan_types")
+  policyVersion      String             @default("flex-v1") @map("policy_version") @db.VarChar(40)
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  subscriptions      FlexSubscription[]
+
+  @@index([status, createdAt])
+  @@map("flex_plans")
+}
+
+model FlexSubscription {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  customerId         String                 @map("customer_id") @db.Uuid
+  flexPlanId         String                 @map("flex_plan_id") @db.Uuid
+  status             FlexSubscriptionStatus @default(PENDING_PAYMENT)
+  primaryCityId      String                 @map("primary_city_id") @db.Uuid
+  secondaryCityId    String?                @map("secondary_city_id") @db.Uuid
+  idempotencyKey     String                 @map("idempotency_key") @db.VarChar(120)
+  planName           String                 @map("plan_name") @db.VarChar(160)
+  planCode           String                 @map("plan_code") @db.VarChar(80)
+  priceMinor         Int                    @map("price_minor")
+  currency           String                 @db.Char(3)
+  durationDays       Int                    @map("duration_days")
+  totalUsageLimit    Int                    @map("total_usage_limit")
+  primaryCityLimit   Int                    @map("primary_city_limit")
+  secondaryCityLimit Int                    @map("secondary_city_limit")
+  dailyUsageLimit    Int                    @map("daily_usage_limit")
+  bookingAdvanceDays Int                    @map("booking_advance_days")
+  eligiblePlanTypes  PlanType[]             @map("eligible_plan_types")
+  policyVersion      String                 @map("policy_version") @db.VarChar(40)
+  startedAt          DateTime?              @map("started_at") @db.Timestamptz(6)
+  currentPeriodStart DateTime?              @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd   DateTime?              @map("current_period_end") @db.Timestamptz(6)
+  expiresAt          DateTime?              @map("expires_at") @db.Timestamptz(6)
+  cancelledAt        DateTime?              @map("cancelled_at") @db.Timestamptz(6)
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  customer           User                   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  plan               FlexPlan               @relation(fields: [flexPlanId], references: [id], onDelete: Restrict)
+  primaryCity        ServiceCity            @relation("FlexPrimaryCity", fields: [primaryCityId], references: [id], onDelete: Restrict)
+  secondaryCity      ServiceCity?           @relation("FlexSecondaryCity", fields: [secondaryCityId], references: [id], onDelete: Restrict)
+  payment            FlexPayment?
+  periods            FlexUsagePeriod[]
+  usages             FlexUsage[]
+  bookings           Booking[]
+
+  @@unique([customerId, idempotencyKey])
+  @@index([customerId, status, expiresAt])
+  @@index([flexPlanId, status])
+  @@map("flex_subscriptions")
+}
+
+model FlexPayment {
+  id                String            @id @default(uuid()) @db.Uuid
+  subscriptionId    String            @unique @map("subscription_id") @db.Uuid
+  provider          String            @db.VarChar(30)
+  providerOrderId   String?           @unique @map("provider_order_id")
+  providerPaymentId String?           @unique @map("provider_payment_id")
+  amount            Int
+  currency          String            @db.Char(3)
+  status            FlexPaymentStatus @default(CREATED)
+  capturedAt        DateTime?         @map("captured_at") @db.Timestamptz(6)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  subscription      FlexSubscription  @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@map("flex_payments")
+}
+
+model FlexUsagePeriod {
+  id                 String                @id @default(uuid()) @db.Uuid
+  subscriptionId     String                @map("subscription_id") @db.Uuid
+  startsAt           DateTime              @map("starts_at") @db.Timestamptz(6)
+  endsAt             DateTime              @map("ends_at") @db.Timestamptz(6)
+  totalLimit         Int                   @map("total_limit")
+  primaryCityLimit   Int                   @map("primary_city_limit")
+  secondaryCityLimit Int                   @map("secondary_city_limit")
+  status             FlexUsagePeriodStatus @default(ACTIVE)
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  subscription       FlexSubscription      @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  usages             FlexUsage[]
+  bookings           Booking[]
+
+  @@unique([subscriptionId, startsAt])
+  @@index([status, endsAt])
+  @@map("flex_usage_periods")
+}
+
+model GymFlexParticipation {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  gymId              String                  @map("gym_id") @db.Uuid
+  branchId           String                  @unique @map("branch_id") @db.Uuid
+  serviceCityId      String                  @map("service_city_id") @db.Uuid
+  enabled            Boolean                 @default(false)
+  allowedPlanTypes   PlanType[]              @default([DAY_PASS]) @map("allowed_plan_types")
+  effectiveFrom      DateTime?               @map("effective_from") @db.Timestamptz(6)
+  effectiveTo        DateTime?               @map("effective_to") @db.Timestamptz(6)
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gym                Gym                     @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  branch             GymBranch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  serviceCity        ServiceCity             @relation(fields: [serviceCityId], references: [id], onDelete: Restrict)
+  reimbursementRules FlexReimbursementRule[]
+
+  @@index([gymId, enabled])
+  @@index([serviceCityId, enabled])
+  @@map("gym_flex_participations")
+}
+
+model FlexReimbursementRule {
+  id              String               @id @default(uuid()) @db.Uuid
+  participationId String               @map("participation_id") @db.Uuid
+  amountMinor     Int                  @map("amount_minor")
+  currency        String               @default("INR") @db.Char(3)
+  version         String               @db.VarChar(40)
+  effectiveFrom   DateTime             @map("effective_from") @db.Timestamptz(6)
+  effectiveTo     DateTime?            @map("effective_to") @db.Timestamptz(6)
+  active          Boolean              @default(true)
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  participation   GymFlexParticipation @relation(fields: [participationId], references: [id], onDelete: Restrict)
+
+  @@unique([participationId, version])
+  @@index([participationId, active, effectiveFrom])
+  @@map("flex_reimbursement_rules")
+}
+
+model FlexUsage {
+  id                    String           @id @default(uuid()) @db.Uuid
+  subscriptionId        String           @map("subscription_id") @db.Uuid
+  periodId              String           @map("period_id") @db.Uuid
+  bookingId             String           @unique @map("booking_id") @db.Uuid
+  customerId            String           @map("customer_id") @db.Uuid
+  gymId                 String           @map("gym_id") @db.Uuid
+  branchId              String           @map("branch_id") @db.Uuid
+  serviceCityId         String           @map("service_city_id") @db.Uuid
+  usageDate             DateTime         @map("usage_date") @db.Date
+  usageUnits            Int              @default(1) @map("usage_units")
+  status                FlexUsageStatus  @default(RESERVED)
+  reimbursementMinor    Int              @map("reimbursement_minor")
+  reimbursementCurrency String           @map("reimbursement_currency") @db.Char(3)
+  reimbursementVersion  String           @map("reimbursement_version") @db.VarChar(40)
+  consumedAt            DateTime?        @map("consumed_at") @db.Timestamptz(6)
+  releasedAt            DateTime?        @map("released_at") @db.Timestamptz(6)
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  subscription          FlexSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  period                FlexUsagePeriod  @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  booking               Booking          @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  customer              User             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  gym                   Gym              @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  branch                GymBranch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  serviceCity           ServiceCity      @relation(fields: [serviceCityId], references: [id], onDelete: Restrict)
+  earning               GymEarning?
+
+  @@index([subscriptionId, periodId, status])
+  @@index([customerId, usageDate])
+  @@index([gymId, createdAt])
+  @@map("flex_usages")
 }
 
 model Review {
@@ -665,6 +959,7 @@ enum LedgerCategory {
   SETTLEMENT
   SETTLEMENT_REVERSAL
   MANUAL_ADJUSTMENT
+  FLEX_REIMBURSEMENT
 }
 
 model Payment {
@@ -740,8 +1035,13 @@ model Refund {
 
 model GymEarning {
   id                 String          @id @default(uuid()) @db.Uuid
-  paymentId          String          @unique @map("payment_id") @db.Uuid
-  payment            Payment         @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  paymentId          String?         @unique @map("payment_id") @db.Uuid
+  payment            Payment?        @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  flexUsageId        String?         @unique @map("flex_usage_id") @db.Uuid
+  flexUsage          FlexUsage?      @relation(fields: [flexUsageId], references: [id], onDelete: Restrict)
+  source             EarningSource   @default(STANDARD_PAYMENT)
+  gymId              String          @map("gym_id") @db.Uuid
+  branchId           String?         @map("branch_id") @db.Uuid
   grossAmount        Int             @map("gross_amount")
   taxAmount          Int             @default(0) @map("tax_amount")
   discountAmount     Int             @default(0) @map("discount_amount")
@@ -756,6 +1056,7 @@ model GymEarning {
   createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   settlementItem     SettlementItem?
 
+  @@index([gymId, settled, createdAt])
   @@map("gym_earnings")
 }
 

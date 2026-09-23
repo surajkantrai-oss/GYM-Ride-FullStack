@@ -45,6 +45,12 @@ export const bookingSelect = {
   completedAt: true,
   createdAt: true,
   updatedAt: true,
+  source: true,
+  flexSubscriptionId: true,
+  flexCityId: true,
+  customerChargeMinor: true,
+  reimbursementMinor: true,
+  reimbursementCurrency: true,
   user: { select: { id: true, firstName: true, lastName: true } },
   gym: { select: { id: true, name: true } },
   branch: { select: { id: true, name: true, city: true, timezone: true } },
@@ -74,6 +80,7 @@ export const bookingSelect = {
     },
   },
   review: { select: { id: true, rating: true, title: true, comment: true, status: true, createdAt: true, editedAt: true } },
+  flexUsage: { select: { id: true, status: true, usageDate: true, consumedAt: true } },
 } satisfies Prisma.BookingSelect;
 type BookingView = Prisma.BookingGetPayload<{ select: typeof bookingSelect }>;
 

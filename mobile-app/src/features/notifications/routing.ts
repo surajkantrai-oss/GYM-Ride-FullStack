@@ -10,5 +10,6 @@ export function safeNotificationRoute(value: unknown): NotificationRoute | null 
     return { screen: data.screen as "Booking" | "CheckIn" | "BookingReview", bookingId: data.bookingId };
   if (data.screen === "Gym" && typeof data.gymId === "string" && uuid.test(data.gymId))
     return { screen: "Gym", gymId: data.gymId };
+  if (data.screen === "Flex") return { screen: "Flex" };
   return null;
 }

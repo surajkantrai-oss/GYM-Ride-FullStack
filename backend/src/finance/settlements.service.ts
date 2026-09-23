@@ -115,13 +115,19 @@ export class SettlementsService {
           settled: false,
           settlementItem: null,
           netAmount: { gt: 0 },
+          gymId,
           createdAt: { gte: start, lt: end },
-          payment: {
-            requiresReview: false,
-            status: { in: ['SUCCESS', 'PARTIALLY_REFUNDED'] },
-            booking: { gymId },
-            refunds: { none: { status: { in: ['CREATED', 'PENDING', 'PROCESSING'] } } },
-          },
+          OR: [
+            {
+              source: 'STANDARD_PAYMENT',
+              payment: {
+                requiresReview: false,
+                status: { in: ['SUCCESS', 'PARTIALLY_REFUNDED'] },
+                refunds: { none: { status: { in: ['CREATED', 'PENDING', 'PROCESSING'] } } },
+              },
+            },
+            { source: 'FLEX_USAGE', flexUsage: { status: 'CONSUMED' } },
+          ],
         },
         orderBy: { id: 'asc' },
         take: 1000,

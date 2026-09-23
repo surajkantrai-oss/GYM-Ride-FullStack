@@ -181,6 +181,21 @@ export class ReconciliationService {
       if (s.status === 'REVERSED' && !s.reversal)
         findings.push({ code: 'MISSING_SETTLEMENT_REVERSAL', entityId: s.id });
     }
+    const [flexBookings, flexUsages, expiredFlex] = await Promise.all([
+      tx.booking.findMany({ where: { source: 'FLEX' }, select: { id: true, flexUsage: { select: { id: true } } }, take: 500 }),
+      tx.flexUsage.findMany({ include: { earning: true }, take: 500, orderBy: { id: 'asc' } }),
+      tx.flexSubscription.findMany({ where: { status: 'ACTIVE', expiresAt: { lte: new Date() } }, select: { id: true }, take: 500 }),
+    ]);
+    const flexLedger = await tx.financialLedgerEntry.findMany({ where: { sourceId: { in: flexUsages.map((usage) => usage.id) }, category: 'FLEX_REIMBURSEMENT' }, select: { sourceId: true, amount: true } });
+    findings.push(...flexBookings.filter((booking) => !booking.flexUsage).map((booking) => ({ code: 'FLEX_BOOKING_MISSING_USAGE', entityId: booking.id })));
+    for (const usage of flexUsages) {
+      if (usage.status === 'CONSUMED' && !usage.earning) findings.push({ code: 'FLEX_USAGE_MISSING_EARNING', entityId: usage.id });
+      if (usage.earning) {
+        if (usage.status !== 'CONSUMED') findings.push({ code: 'FLEX_EARNING_WITHOUT_CONSUMPTION', entityId: usage.id });
+        if (!flexLedger.some((entry) => entry.sourceId === usage.id && entry.amount === usage.reimbursementMinor)) findings.push({ code: 'FLEX_REIMBURSEMENT_LEDGER_MISMATCH', entityId: usage.id });
+      }
+    }
+    findings.push(...expiredFlex.map((subscription) => ({ code: 'FLEX_SUBSCRIPTION_EXPIRY_RECONCILIATION_REQUIRED', entityId: subscription.id })));
     return {
       findings,
       scannedPayments: payments.length,

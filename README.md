@@ -1,6 +1,6 @@
 # GYMRide
 
-GYMRide is a full-stack gym-access marketplace for customers who need day passes or term plans across participating gyms. The repository currently implements Phases 1–8: platform foundations, authentication and gym discovery, Admin and Partner portals, booking, financial workflows, the customer mobile app, secure check-in, reviews, and notifications.
+GYMRide is a full-stack gym-access marketplace for customers who need day passes, term plans, or prepaid multi-city Flex access across participating gyms. The repository currently implements Phases 1–10: platform foundations, authentication and gym discovery, Admin and Partner portals, booking, financial workflows, the customer mobile app, secure check-in, reviews, notifications, GYMRide Flex / Hybrid Mode, and deterministic recommendations.
 
 This is a development/sandbox implementation. It does not claim live payment or payout processing, physical-device push acceptance, cloud deployment, or app-store release.
 
@@ -33,9 +33,11 @@ The mobile project uses Expo prebuild. Generated `mobile-app/android` and `mobil
 - Server-authoritative QR/OTP check-in lifecycle
 - Booking-derived customer reviews, public aggregates and audited Admin moderation
 - Persistent in-app notifications, per-device delivery records, provider abstraction and bounded retries
+- Prepaid multi-city Flex subscriptions, transactional usage reservation, check-in consumption and gym reimbursement
+- Deterministic 0–100 gym recommendations using PostGIS, published ratings, amenities, plans, availability, history and Flex eligibility
 - Jest/Vitest, ESLint, strict TypeScript and Swagger/OpenAPI
 
-Start with the [system overview](docs/architecture/system-overview.md). Phase-specific references include [finance](docs/architecture/phase-5-finance.md), [mobile](docs/architecture/phase-6-mobile.md), [check-in](docs/architecture/phase-7-check-in.md), and [reviews and notifications](docs/architecture/phase-8-reviews-notifications.md).
+Start with the [system overview](docs/architecture/system-overview.md). Phase-specific references include [finance](docs/architecture/phase-5-finance.md), [mobile](docs/architecture/phase-6-mobile.md), [check-in](docs/architecture/phase-7-check-in.md), [reviews and notifications](docs/architecture/phase-8-reviews-notifications.md), [Flex / Hybrid Mode](docs/architecture/phase-9-flex-hybrid.md), and [deterministic recommendations](docs/architecture/phase-10-recommendations.md).
 
 ## Implemented phases
 
@@ -47,8 +49,10 @@ Start with the [system overview](docs/architecture/system-overview.md). Phase-sp
 6. Customer React Native mobile app
 7. Secure QR/OTP check-in
 8. Reviews and notifications
+9. GYMRide Flex / Hybrid Mode
+10. Deterministic recommendation engine
 
-Phase 9 (GYMRide Flex / Hybrid Mode) is planned but is not implemented in this repository state.
+Current validated baseline: 305 standard tests and 51 PostgreSQL/PostGIS runtime tests pass. Backend, Admin and Partner production builds pass; Android and iOS debug simulator builds install and launch locally.
 
 ## Prerequisites
 
@@ -148,6 +152,16 @@ pnpm --filter @gymride/mobile-app exec expo prebuild --platform ios
 pnpm --filter @gymride/mobile-app ios
 ```
 
+## Phase 9 behavior
+
+GYMRide Flex is a prepaid, fixed-period entitlement for one primary and one optional secondary canonical city. Payment activation is backend verified. A Flex booking requires a participating branch and timed slot; allowance is reserved transactionally, released on cancellation, consumed at verified check-in, and forfeited on no-show. The customer pays no incremental booking charge while the backend snapshots a platform-controlled reimbursement that flows through the existing earnings, immutable ledger, and settlement system.
+
+Customer mobile, Partner, and Admin surfaces use real Flex APIs. Partners control branch participation but cannot set reimbursement. Admins manage canonical cities, platform plans, reimbursement rules, subscriptions, and usage. See the Phase 9 architecture document for lifecycle, concurrency, security, and API details.
+
+## Phase 10 behavior
+
+Authenticated recommendations apply hard eligibility and filter rules before deterministic 0–100 scoring. Signals include PostGIS distance, published-review confidence, amenities, active plan price, capacity-backed slot availability, branch-local operating hours, completed-visit affinity, recent popularity, and active Flex eligibility. Home and Explore use the real API; ordinary discovery remains available. Optional, non-sensitive gym preferences can be edited in mobile.
+
 ## Phase 8 behavior
 
 Only an owned `COMPLETED` booking can be reviewed. The API derives customer, gym and branch from the booking, enforces one review per booking in PostgreSQL, exposes only published reviews publicly, computes published aggregates in the database, scopes Partner reads, and audits Admin moderation.
@@ -161,5 +175,7 @@ Notification intent is persisted independently of external push delivery. Unique
 - Android and iOS debug builds, simulator/emulator launch, authenticated session restoration, review rendering, and in-app notification/deep-link flows were validated locally on September 23, 2026. Physical-device acceptance remains separate.
 - Android/iOS production signing, Play Store/App Store release, Azure deployment and production hardening are not complete.
 - Existing earlier-phase limitations remain documented in their architecture files, including confirmed-booking cancellation and slotless membership check-in constraints.
+- Flex recurring billing, proration/refunds, pause, automatic renewal, and slotless Flex access are intentionally not implemented; the initial Flex product requires timed slots.
+- Recommendation performance was validated on a representative local fixture, not production-scale traffic. Phase 10 intentionally has no AI, embeddings, natural-language search, sponsored ranking, or long-lived personalized cache.
 
-Do not begin Phase 9 or later work without an explicit phase request.
+Do not begin Phase 11 or later work without an explicit phase request.

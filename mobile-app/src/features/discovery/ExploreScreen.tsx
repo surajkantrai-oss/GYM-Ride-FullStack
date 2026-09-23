@@ -15,6 +15,7 @@ import {
 } from "../../components/ui";
 import { useSession } from "../../store/session";
 import { useDiscoveryLocation } from "./useLocation";
+import { recommendationReasonLabel } from "../recommendations/reasons";
 export function ExploreScreen() {
   const { api } = useSession();
   const navigation = useNavigation<NativeStackNavigationProp<RootStack>>();
@@ -79,6 +80,12 @@ export function ExploreScreen() {
       };
     },
     getNextPageParam: (last) => last.next,
+  });
+  const recommended = useInfiniteQuery({
+    queryKey: ["recommendations", "explore", applied, filters, location.coordinates],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => api.recommendations(new URLSearchParams({ ...(location.coordinates ? { latitude: String(location.coordinates.latitude), longitude: String(location.coordinates.longitude) } : applied.city ? { city: applied.city } : {}), radiusKm: filters.radiusKm, amenities: filters.amenities, page: String(pageParam), limit: "10" }).toString()),
+    getNextPageParam: (last) => last.meta.hasNextPage ? last.meta.page + 1 : undefined,
   });
   const rows = query.data?.pages.flatMap((p) => p.rows) ?? [];
   const header = (
@@ -157,6 +164,9 @@ export function ExploreScreen() {
         empty={!query.isLoading && !query.error && rows.length === 0}
         retry={() => void query.refetch()}
       />
+      <Title>Recommended</Title>
+      <State loading={recommended.isLoading} error={recommended.error} empty={!recommended.isLoading && recommended.data?.pages[0]?.data?.length === 0} retry={() => void recommended.refetch()} />
+      {recommended.data?.pages[0]?.data?.slice(0, 3).map((item) => <Card key={`recommended-${item.branch.id}`}><Title>{item.gym.name}</Title><Copy>{item.branch.name} · {item.branch.city}</Copy><Copy>{item.reasons.map((reason) => recommendationReasonLabel[reason]).join(" · ")}</Copy><Button label={`View ${item.gym.name}`} onPress={() => navigation.navigate("Gym", { gymId: item.gym.id })} /></Card>)}
     </>
   );
   return (
