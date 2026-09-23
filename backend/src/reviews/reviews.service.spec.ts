@@ -41,7 +41,7 @@ describe('ReviewsService authorization and invariants', () => {
     expect(db.notification.createMany).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['PAYMENT_PENDING', 'CONFIRMED', 'CHECK_IN_AVAILABLE', 'CHECKED_IN', 'NO_SHOW', 'REFUNDED'])('rejects %s bookings', async (status) => {
+  it.each(['CREATED', 'PAYMENT_PENDING', 'CONFIRMED', 'CHECK_IN_AVAILABLE', 'CHECKED_IN', 'CANCELLED', 'EXPIRED', 'NO_SHOW', 'PAYMENT_FAILED', 'REFUNDED'])('rejects %s bookings', async (status) => {
     const { db, service } = make();
     db.booking.findFirst.mockResolvedValue({ ...booking, status });
     await expect(service.create(customerId, bookingId, { rating: 5 })).rejects.toMatchObject({ status: 409 });

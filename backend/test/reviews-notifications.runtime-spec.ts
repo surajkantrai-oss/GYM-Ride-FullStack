@@ -42,7 +42,15 @@ describe('PostgreSQL reviews and notifications (isolated test database)', () => 
     const hidden = await reviews.publicList(f.gym.id, { page: 1, limit: 20 }) as { aggregate: { averageRating: number | null; reviewCount: number }; data: unknown[] };
     expect(hidden.aggregate).toEqual({ averageRating: null, reviewCount: 0 });
     expect(hidden.data).toHaveLength(0);
-    expect(await prisma.auditLog.count({ where: { entityType: 'Review', entityId: review.id, action: 'REVIEW_MODERATED' } })).toBe(1);
+    await reviews.moderate(f.owner.id, review.id, { status: 'PUBLISHED', reason: 'Runtime restore test' });
+    await reviews.edit(f.customer.id, f.booking.id, { rating: 3, comment: 'Updated after restore' });
+    const restored = await reviews.publicList(f.gym.id, { page: 1, limit: 20 }) as { aggregate: { averageRating: number | null; reviewCount: number }; data: unknown[] };
+    expect(restored.aggregate).toEqual({ averageRating: 3, reviewCount: 1 });
+    await reviews.moderate(f.owner.id, review.id, { status: 'REMOVED', reason: 'Runtime removal test' });
+    const removed = await reviews.publicList(f.gym.id, { page: 1, limit: 20 }) as { aggregate: { averageRating: number | null; reviewCount: number }; data: unknown[] };
+    expect(removed.aggregate).toEqual({ averageRating: null, reviewCount: 0 });
+    expect(removed.data).toHaveLength(0);
+    expect(await prisma.auditLog.count({ where: { entityType: 'Review', entityId: review.id, action: 'REVIEW_MODERATED' } })).toBe(3);
   });
 
   it('rejects another customer and a non-completed booking', async () => {
@@ -85,11 +93,36 @@ describe('PostgreSQL reviews and notifications (isolated test database)', () => 
     await expect(notifications.unregisterDevice(f.owner.id, first.id)).rejects.toMatchObject({ status: 404 });
   });
 
+  it('deduplicates concurrent notification intent and device delivery creation', async () => {
+    const f = await fixture();
+    await notifications.registerDevice(f.customer.id, randomUUID(), { platform: 'android', token: `ExpoPushToken[${randomUUID().replaceAll('-', '')}]` });
+    const key = `runtime-concurrent:${randomUUID()}`;
+    const intent = { userId: f.customer.id, type: 'BOOKING_CONFIRMED' as const, category: 'BOOKING' as const, title: 'Booked', body: 'Your booking is confirmed.', route: { screen: 'Booking' as const, bookingId: f.booking.id }, dedupeKey: key };
+    const outcomes = await Promise.allSettled([
+      prisma.$transaction((tx) => createNotificationIntent(tx, intent)),
+      prisma.$transaction((tx) => createNotificationIntent(tx, intent)),
+    ]);
+    expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(2);
+    const notice = await prisma.notification.findUniqueOrThrow({ where: { dedupeKey: key } });
+    expect(await prisma.notification.count({ where: { dedupeKey: key } })).toBe(1);
+    expect(await prisma.pushDelivery.count({ where: { notificationId: notice.id } })).toBe(1);
+  });
+
   it('projects a new successful payment once, even on repeated sweeps', async () => {
     const f = await fixture();
     const payment = await prisma.payment.create({ data: { bookingId: f.booking.id, provider: 'development', amount: 100000, currency: 'INR', status: 'SUCCESS' } });
     await projection.projectPaymentStatus();
     await projection.projectPaymentStatus();
     expect(await prisma.notification.count({ where: { dedupeKey: `payment:${payment.id}:PAYMENT_CONFIRMED` } })).toBe(1);
+  });
+
+  it('projects a failed refund once without affecting the booking transaction', async () => {
+    const f = await fixture();
+    const payment = await prisma.payment.create({ data: { bookingId: f.booking.id, provider: 'development', amount: 100000, currency: 'INR', status: 'SUCCESS' } });
+    const refund = await prisma.refund.create({ data: { paymentId: payment.id, idempotencyKey: randomUUID(), amount: 100000, reason: 'Runtime failed refund', requestedBy: f.customer.id, status: 'FAILED' } });
+    await projection.projectFailedRefunds();
+    await projection.projectFailedRefunds();
+    expect(await prisma.notification.count({ where: { dedupeKey: `refund:${refund.id}:failed` } })).toBe(1);
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: f.booking.id } })).status).toBe('COMPLETED');
   });
 });

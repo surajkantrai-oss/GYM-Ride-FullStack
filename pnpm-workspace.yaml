@@ -8,7 +8,7 @@ patchedDependencies:
   expo-modules-jsi@57.1.0: patches/expo-modules-jsi@57.1.0.patch
 
 allowBuilds:
-  '@anthropic-ai/claude-code': set this to true or false
+  '@anthropic-ai/claude-code': false
   '@parcel/watcher': false
   '@prisma/client': true
   '@prisma/engines': true

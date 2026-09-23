@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsEnum, IsInt, IsISO8601, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsEnum, IsInt, IsISO8601, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { ReviewStatus } from '@prisma/client';
 import { PaginationDto } from '../common/dto/pagination.dto';
 
@@ -79,6 +79,7 @@ export class ModerateReviewDto {
 
   @ApiProperty({ minLength: 3, maxLength: 500 })
   @IsString()
+  @MinLength(3)
   @MaxLength(500)
   @Transform(trim)
   reason!: string;

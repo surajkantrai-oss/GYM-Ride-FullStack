@@ -57,6 +57,7 @@ export class NotificationProjectionService {
     }
     total += await this.projectPaymentStatus();
     total += await this.projectRefundStatus();
+    total += await this.projectFailedRefunds();
     total += await this.projectPaidSettlements();
     return total;
   }
@@ -101,6 +102,29 @@ export class NotificationProjectionService {
         if (refund.status !== 'SUCCESS') continue;
         const booking = refund.payment.booking;
         await createNotificationIntent(tx, { userId: booking.userId, type: NotificationType.REFUND_COMPLETED, category: NotificationCategory.REFUND, title: 'Refund completed', body: `A refund for ${booking.gym.name} is complete.`, route: { screen: 'Booking', bookingId: booking.id }, dedupeKey: `refund:${refund.id}:success` });
+        await tx.notificationProjection.create({ data: { source: name, sourceId: refund.id } });
+      }
+      return rows.length;
+    });
+  }
+
+  async projectFailedRefunds(): Promise<number> {
+    const name = 'refund-failed';
+    return this.prisma.$transaction(async (tx) => {
+      const pending = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT r.id FROM refunds r
+        WHERE r.status = 'FAILED'
+          AND NOT EXISTS (SELECT 1 FROM notification_projections n WHERE n.source = ${name} AND n.source_id = r.id)
+        ORDER BY r.updated_at ASC, r.id ASC LIMIT 100 FOR UPDATE OF r SKIP LOCKED
+      `);
+      const rows = await tx.refund.findMany({
+        where: { id: { in: pending.map((item) => item.id) } },
+        include: { payment: { select: { booking: { select: { id: true, userId: true, gym: { select: { name: true } } } } } } },
+      });
+      for (const refund of rows) {
+        if (refund.status !== 'FAILED') continue;
+        const booking = refund.payment.booking;
+        await createNotificationIntent(tx, { userId: booking.userId, type: NotificationType.REFUND_FAILED, category: NotificationCategory.REFUND, title: 'Refund needs attention', body: `A refund for ${booking.gym.name} could not be completed.`, route: { screen: 'Booking', bookingId: booking.id }, dedupeKey: `refund:${refund.id}:failed` });
         await tx.notificationProjection.create({ data: { source: name, sourceId: refund.id } });
       }
       return rows.length;
