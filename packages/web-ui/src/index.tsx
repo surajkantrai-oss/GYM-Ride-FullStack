@@ -336,6 +336,21 @@ export interface NavItem {
   label: string;
   short: string;
 }
+
+const navIcons: Record<string, string> = {
+  DB: "⌂",
+  GY: "◇",
+  PR: "✓",
+  BK: "▣",
+  RV: "★",
+  FN: "₹",
+  FX: "↗",
+  NT: "●",
+  CI: "⌁",
+  ME: "○",
+  "+": "+",
+};
+
 export function AppShell({
   children,
   appName,
@@ -346,6 +361,8 @@ export function AppShell({
   nav: NavItem[];
 }) {
   const { user, logout } = useAuth();
+  const currentPath =
+    typeof window === "undefined" ? "" : window.location.pathname;
   return (
     <div className="app-frame">
       <aside className="sidebar">
@@ -357,8 +374,17 @@ export function AppShell({
         </a>
         <nav aria-label="Primary navigation">
           {nav.map((item) => (
-            <a href={item.href} key={item.href}>
-              <span>{item.short}</span>
+            <a
+              href={item.href}
+              key={item.href}
+              aria-current={
+                currentPath === item.href ||
+                (item.href !== "/dashboard" && currentPath.startsWith(`${item.href}/`))
+                  ? "page"
+                  : undefined
+              }
+            >
+              <span aria-hidden="true">{navIcons[item.short] ?? item.short}</span>
               {item.label}
             </a>
           ))}
@@ -372,6 +398,19 @@ export function AppShell({
         </div>
       </aside>
       <div className="main-column">
+        <header className="desktop-header">
+          <div>
+            <strong>{appName} workspace</strong>
+            <small>Live operations</small>
+          </div>
+          <div className="desktop-header-user" aria-label="Signed in user">
+            <span>{displayName(user).slice(0, 1).toUpperCase()}</span>
+            <div>
+              <strong>{displayName(user)}</strong>
+              <small>{user?.roles.join(" · ")}</small>
+            </div>
+          </div>
+        </header>
         <header className="mobile-header">
           <a className="brand" href="/dashboard">
             GYMRide · {appName}
@@ -425,7 +464,7 @@ export function PageState({
 }) {
   return (
     <section className="page-state">
-      <div className="state-icon">◇</div>
+      <div className="state-icon" aria-hidden="true">◇</div>
       <h2>{title}</h2>
       {detail && <p>{detail}</p>}
       {action}

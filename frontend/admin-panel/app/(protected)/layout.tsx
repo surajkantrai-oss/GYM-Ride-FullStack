@@ -1,9 +1,9 @@
 "use client";
 import { AppShell, AuthGate } from "@gymride/web-ui";
 const nav = [
+  { href: "/dashboard", label: "Dashboard", short: "DB" },
   { href: "/flex", label: "Flex", short: "FX" },
   { href: "/finance", label: "Finance", short: "FN" },
-  { href: "/dashboard", label: "Dashboard", short: "DB" },
   { href: "/gyms", label: "All gyms", short: "GY" },
   { href: "/gyms/pending", label: "Pending review", short: "PR" },
   { href: "/bookings", label: "Bookings", short: "BK" },

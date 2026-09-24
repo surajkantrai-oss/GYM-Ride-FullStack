@@ -1,8 +1,21 @@
 import { useState } from "react";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStack } from "../../navigation/types";
-import { Button, Card, Copy, Screen, State, Title } from "../../components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Chip,
+  Copy,
+  Screen,
+  SectionTitle,
+  State,
+  Title,
+  palette,
+} from "../../components/ui";
+import { gymVisual } from "../../components/gym-visuals";
 import { useSession } from "../../store/session";
 import { money } from "../../utils/domain";
 export function GymScreen({
@@ -26,9 +39,10 @@ export function GymScreen({
   });
   const branch = gym.data?.branches.find((b) => b.id === branchId);
   const flexMode = route.params.flexMode === true;
-  const visibleBranches = flexMode && route.params.flexBranchId
-    ? gym.data?.branches.filter((b) => b.id === route.params.flexBranchId)
-    : gym.data?.branches;
+  const visibleBranches =
+    flexMode && route.params.flexBranchId
+      ? gym.data?.branches.filter((b) => b.id === route.params.flexBranchId)
+      : gym.data?.branches;
   return (
     <Screen>
       <State
@@ -38,51 +52,106 @@ export function GymScreen({
       />
       {gym.data && (
         <>
+          <View style={local.heroWrap}>
+            <Image source={gymVisual(gym.data.id)} style={local.hero} />
+            <View style={local.heroShade} />
+            <View style={local.heroBadge}>
+              <Badge
+                label={flexMode ? "Flex eligible" : "GYMRide verified"}
+                tone="success"
+              />
+            </View>
+          </View>
           <Title>{gym.data.name}</Title>
+          <View style={local.meta}>
+            <Text style={local.rating}>
+              ★{" "}
+              {gym.data.averageRating == null
+                ? "New"
+                : gym.data.averageRating.toFixed(1)}
+            </Text>
+            <Text style={local.metaText}>
+              {gym.data.reviewCount || 0} reviews
+            </Text>
+            <Text style={local.metaText}>
+              {gym.data.branches.length} branches
+            </Text>
+          </View>
+          <View style={local.tabs}>
+            <Text style={local.tabActive}>Overview</Text>
+            <Text style={local.tab}>Branches</Text>
+            <Text style={local.tab}>Reviews</Text>
+            <Text style={local.tab}>About</Text>
+          </View>
           <Copy>
             {gym.data.description || "Make this your next training space."}
           </Copy>
-          <Copy>{gym.data.averageRating == null ? "No ratings yet" : `${gym.data.averageRating.toFixed(1)} / 5` } · {gym.data.reviewCount || 0} reviews</Copy>
-          <State loading={reviews.isLoading} error={reviews.error} retry={() => void reviews.refetch()} />
-          {reviews.data?.data.slice(0, 2).map((review) => <Card key={review.id}>
-            <Copy>{"★".repeat(review.rating)} · {review.reviewerName}</Copy>
-            {review.comment && <Copy>{review.comment}</Copy>}
-          </Card>)}
-          <Button label="See all reviews" onPress={() => navigation.navigate("GymReviews", { gymId: route.params.gymId })} />
-          <Title>Choose a branch</Title>
-          {flexMode && <Copy>Flex booking · your visit is covered by your active subscription.</Copy>}
-          {visibleBranches?.map((b) => (
-            <Button
-              key={b.id}
-              label={`${branchId === b.id ? "Selected: " : ""}${b.name} · ${b.city}`}
-              onPress={() => setBranchId(b.id)}
-            />
+          <State
+            loading={reviews.isLoading}
+            error={reviews.error}
+            retry={() => void reviews.refetch()}
+          />
+          {reviews.data?.data.slice(0, 2).map((review) => (
+            <Card key={review.id}>
+              <Copy>
+                {"★".repeat(review.rating)} · {review.reviewerName}
+              </Copy>
+              {review.comment && <Copy>{review.comment}</Copy>}
+            </Card>
           ))}
+          <Button
+            variant="secondary"
+            label="See all reviews"
+            onPress={() =>
+              navigation.navigate("GymReviews", { gymId: route.params.gymId })
+            }
+          />
+          <SectionTitle>Choose a branch</SectionTitle>
+          {flexMode && (
+            <Copy>
+              Flex booking · your visit is covered by your active subscription.
+            </Copy>
+          )}
+          <View style={local.chips}>
+            {visibleBranches?.map((b) => (
+              <Chip
+                key={b.id}
+                label={`${b.name} · ${b.city}`}
+                selected={branchId === b.id}
+                onPress={() => setBranchId(b.id)}
+              />
+            ))}
+          </View>
           {branch && (
             <>
               <Card>
-                <Title>{branch.name}</Title>
+                <SectionTitle>{branch.name}</SectionTitle>
                 <Copy>
                   {branch.address}, {branch.city}, {branch.state}{" "}
                   {branch.postalCode}
                 </Copy>
+                <View style={local.chips}>
+                  {branch.amenities?.map((a) => {
+                    const amenity = "amenity" in a ? a.amenity.name : a.name;
+                    return <Chip key={amenity} label={amenity} />;
+                  })}
+                </View>
                 <Copy>
-                  {branch.amenities
-                    ?.map((a) => ("amenity" in a ? a.amenity.name : a.name))
-                    .join(" · ")}
+                  {branch.operatingHours?.filter((h) => !h.isClosed).length ||
+                    0}{" "}
+                  operating days · {branch.timezone}
                 </Copy>
-                {branch.operatingHours?.map((h, i) => (
-                  <Copy key={i}>
-                    {h.weekday}:{" "}
-                    {h.isClosed
-                      ? "Closed"
-                      : `${h.opensAt?.slice(11, 16)}–${h.closesAt?.slice(11, 16)}`}{" "}
-                    ({branch.timezone})
-                  </Copy>
-                ))}
               </Card>
-              <Button label={`Reviews for ${branch.name}`} onPress={() => navigation.navigate("GymReviews", { gymId: route.params.gymId, branchId: branch.id })} />
-              <Title>Plans</Title>
+              <Button
+                label={`Reviews for ${branch.name}`}
+                onPress={() =>
+                  navigation.navigate("GymReviews", {
+                    gymId: route.params.gymId,
+                    branchId: branch.id,
+                  })
+                }
+              />
+              <SectionTitle>Plans & passes</SectionTitle>
               <State
                 loading={plans.isLoading}
                 error={plans.error}
@@ -93,7 +162,7 @@ export function GymScreen({
                 ?.filter((p) => p.status === "ACTIVE")
                 .map((plan) => (
                   <Card key={plan.id}>
-                    <Title>{plan.name}</Title>
+                    <SectionTitle>{plan.name}</SectionTitle>
                     <Copy>
                       {money(plan.priceMinor, plan.currency)} ·{" "}
                       {plan.type.replaceAll("_", " ")}
@@ -118,3 +187,38 @@ export function GymScreen({
     </Screen>
   );
 }
+
+const local = StyleSheet.create({
+  heroWrap: {
+    height: 270,
+    borderRadius: 28,
+    overflow: "hidden",
+    backgroundColor: palette.ink,
+    position: "relative",
+  },
+  hero: { width: "100%", height: "100%" },
+  heroShade: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(7,35,25,.12)",
+  },
+  heroBadge: { position: "absolute", left: 16, bottom: 16 },
+  meta: { flexDirection: "row", alignItems: "center", gap: 12 },
+  rating: { color: palette.warning, fontWeight: "800", fontSize: 15 },
+  metaText: { color: palette.muted, fontSize: 13 },
+  tabs: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+  },
+  tab: { paddingVertical: 12, color: palette.muted, fontSize: 13 },
+  tabActive: {
+    paddingVertical: 12,
+    color: palette.accent,
+    fontWeight: "800",
+    borderBottomWidth: 2,
+    borderBottomColor: palette.accent,
+    fontSize: 13,
+  },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+});

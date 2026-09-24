@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Text } from "react-native";
 import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -38,15 +39,19 @@ function openPushData(data: unknown) {
   else navigationRef.navigate("Notifications");
 }
 function MainTabs() {
+  const icons: Record<string, string> = { Home: "⌂", Explore: "⌕", Bookings: "▣", Profile: "○" };
   return (
     <Tabs.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         tabBarActiveTintColor: palette.accent,
-        tabBarIcon: () => null,
-        tabBarIconStyle: { display: "none" },
-        tabBarLabelStyle: { fontSize: 14, fontWeight: "600" },
-        headerTitleStyle: { color: palette.ink },
-      }}
+        tabBarInactiveTintColor: palette.muted,
+        tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 19, fontWeight: "800" }}>{icons[route.name]}</Text>,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "700", marginTop: 1 },
+        tabBarStyle: { height: 72, paddingTop: 8, paddingBottom: 10, backgroundColor: palette.surface, borderTopColor: palette.border },
+        headerStyle: { backgroundColor: palette.canvas },
+        headerShadowVisible: false,
+        headerTitleStyle: { color: palette.ink, fontWeight: "800" },
+      })}
     >
       <Tabs.Screen name="Home" component={HomeScreen} />
       <Tabs.Screen name="Explore" component={ExploreScreen} />
@@ -82,7 +87,7 @@ export function AppNavigator() {
         }
       });
     }}>
-      <Stack.Navigator screenOptions={{ headerTintColor: palette.ink }}>
+      <Stack.Navigator screenOptions={{ headerTintColor: palette.ink, headerStyle: { backgroundColor: palette.canvas }, headerShadowVisible: false, headerTitleStyle: { fontWeight: "800" } }}>
         <Stack.Screen
           name="Main"
           component={MainTabs}

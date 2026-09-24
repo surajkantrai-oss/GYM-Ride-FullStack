@@ -102,10 +102,16 @@ export function GymList({ lockedStatus }: { lockedStatus?: GymStatus }) {
                 </tr>
               </thead>
               <tbody>
-                {query.data.data.map((gym) => (
+                {query.data.data.map((gym, index) => (
                   <tr key={gym.id}>
                     <td>
-                      <a href={`/gyms/${gym.id}`}>
+                      <a className="table-gym" href={`/gyms/${gym.id}`}>
+                        <span
+                          className="table-gym-image"
+                          style={{
+                            backgroundImage: `url(/images/${["gym-warm.jpg", "gym-strength.jpg", "gym-airy.jpg"][index % 3]})`,
+                          }}
+                        />
                         <strong>{gym.name}</strong>
                       </a>
                     </td>

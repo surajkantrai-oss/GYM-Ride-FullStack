@@ -37,7 +37,7 @@ The mobile project uses Expo prebuild. Generated `mobile-app/android` and `mobil
 - Deterministic 0–100 gym recommendations using PostGIS, published ratings, amenities, plans, availability, history and Flex eligibility
 - Jest/Vitest, ESLint, strict TypeScript and Swagger/OpenAPI
 
-Start with the [system overview](docs/architecture/system-overview.md). Phase-specific references include [finance](docs/architecture/phase-5-finance.md), [mobile](docs/architecture/phase-6-mobile.md), [check-in](docs/architecture/phase-7-check-in.md), [reviews and notifications](docs/architecture/phase-8-reviews-notifications.md), [Flex / Hybrid Mode](docs/architecture/phase-9-flex-hybrid.md), and [deterministic recommendations](docs/architecture/phase-10-recommendations.md).
+Start with the [system overview](docs/architecture/system-overview.md). Phase-specific references include [finance](docs/architecture/phase-5-finance.md), [mobile](docs/architecture/phase-6-mobile.md), [check-in](docs/architecture/phase-7-check-in.md), [reviews and notifications](docs/architecture/phase-8-reviews-notifications.md), [Flex / Hybrid Mode](docs/architecture/phase-9-flex-hybrid.md), and [deterministic recommendations](docs/architecture/phase-10-recommendations.md). The presentation layer is documented in the [GYMRide design system](docs/design/GYMRIDE_DESIGN_SYSTEM.md) and [UI/UX redesign guide](docs/design/UI_UX_REDESIGN.md).
 
 ## Implemented phases
 
@@ -53,6 +53,8 @@ Start with the [system overview](docs/architecture/system-overview.md). Phase-sp
 10. Deterministic recommendation engine
 
 Current validated baseline: 305 standard tests and 51 PostgreSQL/PostGIS runtime tests pass. Backend, Admin and Partner production builds pass; Android and iOS debug simulator builds install and launch locally.
+
+The Admin and Partner portals use a shared contemporary SaaS shell, while the customer mobile app uses a warmer lifestyle-focused visual system. The redesign preserves all Phase 1–10 routes, API calls, validation, permissions, and business behavior.
 
 ## Prerequisites
 

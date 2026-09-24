@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStack } from "../../navigation/types";
-import { Button, Card, Copy, Screen, State, Title } from "../../components/ui";
+import { Button, Card, Copy, Screen, SectionTitle, State, Title } from "../../components/ui";
 import { useSession } from "../../store/session";
 
 export function GymReviewsScreen({ route }: NativeStackScreenProps<RootStack, "GymReviews">) {
@@ -17,7 +17,7 @@ export function GymReviewsScreen({ route }: NativeStackScreenProps<RootStack, "G
       <Copy>{query.data.aggregate.averageRating === null ? "No ratings yet" : `${query.data.aggregate.averageRating.toFixed(1)} / 5` } · {query.data.aggregate.reviewCount} review{query.data.aggregate.reviewCount === 1 ? "" : "s"}</Copy>
       {query.data.data.map((review) => <Card key={review.id}>
         <Copy>{"★".repeat(review.rating)} · {review.reviewerName}</Copy>
-        {review.title && <Copy>{review.title}</Copy>}
+        {review.title && <SectionTitle>{review.title}</SectionTitle>}
         {review.comment && <Copy>{review.comment}</Copy>}
         <Copy>{new Date(review.createdAt).toLocaleDateString()}</Copy>
       </Card>)}

@@ -48,13 +48,16 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("react-native", () => ({
   ActivityIndicator: "Spinner",
+  Image: "Image",
+  ImageBackground: "ImageBackground",
   Pressable: "Button",
   ScrollView: "Scroll",
   Text: "Text",
   TextInput: "Input",
   View: "View",
+  Switch: "Switch",
   RefreshControl: "RefreshControl",
-  StyleSheet: { create: (value: unknown) => value },
+  StyleSheet: { create: (value: unknown) => value, absoluteFill: {} },
   Alert: { alert: vi.fn() },
   Linking: { openSettings: vi.fn() },
   FlatList: ({
@@ -81,6 +84,7 @@ vi.mock("react-native", () => ({
       ),
     ),
 }));
+vi.mock("./components/gym-visuals", () => ({ gymVisual: () => 1, heroVisual: 1 }));
 vi.mock("@react-navigation/native", () => ({
   useNavigation: () => ({ navigate: vi.fn() }),
 }));

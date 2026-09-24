@@ -1,18 +1,22 @@
 import { useState } from "react";
-import { FlatList, Linking } from "react-native";
+import { FlatList, Linking, StyleSheet, Text, View } from "react-native";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStack } from "../../navigation/types";
 import {
   Button,
-  Card,
+  Chip,
   Copy,
+  GymCard,
   Input,
   Screen,
+  SectionTitle,
   State,
   Title,
+  palette,
 } from "../../components/ui";
+import { gymVisual } from "../../components/gym-visuals";
 import { useSession } from "../../store/session";
 import { useDiscoveryLocation } from "./useLocation";
 import { recommendationReasonLabel } from "../recommendations/reasons";
@@ -23,7 +27,6 @@ export function ExploreScreen() {
   const [search, setSearch] = useState("");
   const [city, setCity] = useState("");
   const [applied, setApplied] = useState({ search: "", city: "" });
-  const [state, setState] = useState("");
   const [amenities, setAmenities] = useState("");
   const [radius, setRadius] = useState("10");
   const [filters, setFilters] = useState({
@@ -82,24 +85,117 @@ export function ExploreScreen() {
     getNextPageParam: (last) => last.next,
   });
   const recommended = useInfiniteQuery({
-    queryKey: ["recommendations", "explore", applied, filters, location.coordinates],
+    queryKey: [
+      "recommendations",
+      "explore",
+      applied,
+      filters,
+      location.coordinates,
+    ],
     initialPageParam: 1,
-    queryFn: async ({ pageParam }) => api.recommendations(new URLSearchParams({ ...(location.coordinates ? { latitude: String(location.coordinates.latitude), longitude: String(location.coordinates.longitude) } : applied.city ? { city: applied.city } : {}), radiusKm: filters.radiusKm, amenities: filters.amenities, page: String(pageParam), limit: "10" }).toString()),
-    getNextPageParam: (last) => last.meta.hasNextPage ? last.meta.page + 1 : undefined,
+    queryFn: async ({ pageParam }) =>
+      api.recommendations(
+        new URLSearchParams({
+          ...(location.coordinates
+            ? {
+                latitude: String(location.coordinates.latitude),
+                longitude: String(location.coordinates.longitude),
+              }
+            : applied.city
+              ? { city: applied.city }
+              : {}),
+          radiusKm: filters.radiusKm,
+          amenities: filters.amenities,
+          page: String(pageParam),
+          limit: "10",
+        }).toString(),
+      ),
+    getNextPageParam: (last) =>
+      last.meta.hasNextPage ? last.meta.page + 1 : undefined,
   });
   const rows = query.data?.pages.flatMap((p) => p.rows) ?? [];
   const header = (
     <>
-      <Title>Find your gym</Title>
-      <Copy>Use your location once for nearby gyms, or search by city.</Copy>
+      <View style={local.heading}>
+        <View>
+          <Text style={local.context}>DISCOVER</Text>
+          <Title>Explore gyms</Title>
+        </View>
+        <Text style={local.location}>⌖ {applied.city || "Near you"}</Text>
+      </View>
+      <Input
+        label="Search gyms or areas"
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Gym name, area or city…"
+      />
+      <Input
+        label="City"
+        value={city}
+        onChangeText={setCity}
+        placeholder="e.g. Bengaluru"
+      />
+      <View style={local.chips}>
+        <Chip
+          label="Nearby"
+          selected={Boolean(location.coordinates)}
+          onPress={() => void location.locate()}
+        />
+        <Chip
+          label="5 km"
+          selected={radius === "5"}
+          onPress={() => setRadius("5")}
+        />
+        <Chip
+          label="10 km"
+          selected={radius === "10"}
+          onPress={() => setRadius("10")}
+        />
+        <Chip
+          label="Parking"
+          selected={amenities.includes("parking")}
+          onPress={() =>
+            setAmenities(
+              amenities.includes("parking")
+                ? amenities
+                    .split(",")
+                    .filter((item) => item !== "parking")
+                    .join(",")
+                : [amenities, "parking"].filter(Boolean).join(","),
+            )
+          }
+        />
+        <Chip
+          label="Wi-Fi"
+          selected={amenities.includes("wifi")}
+          onPress={() =>
+            setAmenities(
+              amenities.includes("wifi")
+                ? amenities
+                    .split(",")
+                    .filter((item) => item !== "wifi")
+                    .join(",")
+                : [amenities, "wifi"].filter(Boolean).join(","),
+            )
+          }
+        />
+        <Chip label="Flex" onPress={() => navigation.navigate("Flex")} />
+      </View>
       <Button
-        label={
-          location.status === "loading"
-            ? "Finding location…"
-            : "Use my location"
+        label="Show matching gyms"
+        disabled={
+          !Number.isFinite(Number(radius)) ||
+          Number(radius) < 0.1 ||
+          Number(radius) > 50
         }
-        disabled={location.status === "loading"}
-        onPress={() => void location.locate()}
+        onPress={() => {
+          setFilters({
+            state: "",
+            amenities: amenities.trim(),
+            radiusKm: radius,
+          });
+          setApplied({ search: search.trim(), city: city.trim() });
+        }}
       />
       {["denied", "restricted", "unavailable"].includes(location.status) && (
         <Copy>Location unavailable. You can continue with city search.</Copy>
@@ -110,48 +206,6 @@ export function ExploreScreen() {
           onPress={() => void Linking.openSettings()}
         />
       )}
-      <Input label="Gym or area" value={search} onChangeText={setSearch} />
-      <Input label="City" value={city} onChangeText={setCity} />
-      <Input label="State" value={state} onChangeText={setState} />
-      <Input
-        label="Amenities (comma-separated codes)"
-        value={amenities}
-        onChangeText={setAmenities}
-      />
-      <Input
-        label="Nearby radius in km (0.1–50)"
-        value={radius}
-        onChangeText={setRadius}
-        keyboardType="decimal-pad"
-      />
-      <Button
-        label="Apply filters"
-        disabled={
-          !Number.isFinite(Number(radius)) ||
-          Number(radius) < 0.1 ||
-          Number(radius) > 50
-        }
-        onPress={() => {
-          setFilters({
-            state: state.trim(),
-            amenities: amenities.trim(),
-            radiusKm: radius,
-          });
-          setApplied({ search: search.trim(), city: city.trim() });
-        }}
-      />
-      <Button
-        label="Search by city instead"
-        onPress={() => {
-          location.clear();
-          setApplied({ search: search.trim(), city: city.trim() });
-          setFilters({
-            ...filters,
-            state: state.trim(),
-            amenities: amenities.trim(),
-          });
-        }}
-      />
       {location.coordinates && (
         <Copy>
           Nearby mode uses radius and amenities. Use city search for text, city
@@ -164,9 +218,29 @@ export function ExploreScreen() {
         empty={!query.isLoading && !query.error && rows.length === 0}
         retry={() => void query.refetch()}
       />
-      <Title>Recommended</Title>
-      <State loading={recommended.isLoading} error={recommended.error} empty={!recommended.isLoading && recommended.data?.pages[0]?.data?.length === 0} retry={() => void recommended.refetch()} />
-      {recommended.data?.pages[0]?.data?.slice(0, 3).map((item) => <Card key={`recommended-${item.branch.id}`}><Title>{item.gym.name}</Title><Copy>{item.branch.name} · {item.branch.city}</Copy><Copy>{item.reasons.map((reason) => recommendationReasonLabel[reason]).join(" · ")}</Copy><Button label={`View ${item.gym.name}`} onPress={() => navigation.navigate("Gym", { gymId: item.gym.id })} /></Card>)}
+      <SectionTitle>Recommended for you</SectionTitle>
+      <State
+        loading={recommended.isLoading}
+        error={recommended.error}
+        empty={
+          !recommended.isLoading &&
+          recommended.data?.pages[0]?.data?.length === 0
+        }
+        retry={() => void recommended.refetch()}
+      />
+      {recommended.data?.pages[0]?.data?.slice(0, 3).map((item) => (
+        <GymCard
+          key={`recommended-${item.branch.id}`}
+          name={item.gym.name}
+          meta={`${item.branch.name} · ${item.branch.city}`}
+          detail={item.reasons
+            .map((reason) => recommendationReasonLabel[reason])
+            .join(" · ")}
+          image={gymVisual(item.gym.id)}
+          onPress={() => navigation.navigate("Gym", { gymId: item.gym.id })}
+        />
+      ))}
+      <SectionTitle>All gyms</SectionTitle>
     </>
   );
   return (
@@ -183,17 +257,37 @@ export function ExploreScreen() {
             void query.fetchNextPage();
         }}
         renderItem={({ item }) => (
-          <Card>
-            <Title>{item.name}</Title>
-            <Copy>{item.description}</Copy>
-            {!!item.amenities && <Copy>{item.amenities}</Copy>}
-            <Button
-              label={`View ${item.name}`}
-              onPress={() => navigation.navigate("Gym", { gymId: item.gymId })}
-            />
-          </Card>
+          <GymCard
+            name={item.name}
+            meta={item.description}
+            detail={item.amenities || "Plans available"}
+            image={gymVisual(item.gymId)}
+            onPress={() => navigation.navigate("Gym", { gymId: item.gymId })}
+          />
         )}
       />
     </Screen>
   );
 }
+
+const local = StyleSheet.create({
+  heading: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  context: {
+    fontSize: 11,
+    letterSpacing: 1.8,
+    fontWeight: "800",
+    color: palette.accent,
+  },
+  location: {
+    fontSize: 13,
+    color: palette.muted,
+    fontWeight: "700",
+    paddingBottom: 8,
+  },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginVertical: 2 },
+});

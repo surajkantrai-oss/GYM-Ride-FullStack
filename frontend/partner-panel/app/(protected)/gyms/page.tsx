@@ -72,17 +72,29 @@ function List() {
       ) : (
         <>
           <div className="card-grid">
-            {query.data.data.map((gym) => (
-              <a className="card" href={`/gyms/${gym.id}`} key={gym.id}>
+            {query.data.data.map((gym, index) => (
+              <a
+                className="card gym-card"
+                href={`/gyms/${gym.id}`}
+                key={gym.id}
+              >
+                <div
+                  className="gym-card-image"
+                  style={{
+                    backgroundImage: `url(/images/${["gym-warm.jpg", "gym-strength.jpg", "gym-airy.jpg"][index % 3]})`,
+                  }}
+                >
+                  <StatusBadge status={gym.status} />
+                </div>
                 <div>
                   <h3>{gym.name}</h3>
                   <p className="muted">
                     {gym.description || "No description yet"}
                   </p>
                 </div>
-                <div className="data-row">
-                  <span>{gym.branches?.length ?? 0} branches</span>
-                  <StatusBadge status={gym.status} />
+                <div className="gym-card-meta">
+                  <span>♟ {gym.branches?.length ?? 0} branches</span>
+                  <span>⌖ {gym.branches?.[0]?.city || "Location pending"}</span>
                 </div>
                 {gym.statusReason && (
                   <div className="reason-box">{gym.statusReason}</div>

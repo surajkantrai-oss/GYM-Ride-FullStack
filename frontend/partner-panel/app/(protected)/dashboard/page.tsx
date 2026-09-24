@@ -33,29 +33,55 @@ export default function DashboardPage() {
       />
       <section className="metric-grid">
         <article className="metric">
+          <span className="metric-icon">◇</span>
           <strong>{query.data.totalGyms}</strong>
           <span>Total gyms</span>
         </article>
         <article className="metric">
+          <span className="metric-icon">⌖</span>
           <strong>{query.data.totalBranches ?? 0}</strong>
           <span>Total branches</span>
         </article>
         {labels.map(([status, label]) => (
           <article className="metric" key={status}>
+            <span className="metric-icon">
+              {status === "APPROVED" ? "✓" : status === "DRAFT" ? "□" : "○"}
+            </span>
             <strong>{query.data.statuses[status] ?? 0}</strong>
             <span>{label}</span>
           </article>
         ))}
       </section>
-      <section className="panel">
-        <h2>Next best step</h2>
-        <p className="muted">
-          Complete every branch’s operating hours before submitting a draft or
-          rejected gym for review.
-        </p>
-        <a className="button" href="/gyms">
-          Manage gyms
-        </a>
+      <section className="dashboard-grid">
+        <div className="panel">
+          <span className="eyebrow">Portfolio health</span>
+          <h2>Gym status</h2>
+          <div className="status-bars">
+            {labels.map(([status, label]) => (
+              <div className="status-bar" key={status}>
+                <span>{label}</span>
+                <div>
+                  <i
+                    style={{
+                      width: `${Math.max(8, ((query.data.statuses[status] ?? 0) / Math.max(query.data.totalGyms, 1)) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <strong>{query.data.statuses[status] ?? 0}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+        <section className="panel action-panel">
+          <h2>Next best step</h2>
+          <p className="muted">
+            Complete every branch’s operating hours before submitting a draft or
+            rejected gym for review.
+          </p>
+          <a className="button" href="/gyms">
+            Manage gyms
+          </a>
+        </section>
       </section>
     </>
   );
