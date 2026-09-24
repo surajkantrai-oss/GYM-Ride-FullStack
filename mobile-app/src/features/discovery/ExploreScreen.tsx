@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FlatList, Linking, StyleSheet, Text, View } from "react-native";
+import { FlatList, Linking, StyleSheet, View } from "react-native";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -13,9 +13,8 @@ import {
   Screen,
   SectionTitle,
   State,
-  Title,
-  palette,
 } from "../../components/ui";
+import { AppHeader } from "../../components/headers";
 import { gymVisual } from "../../components/gym-visuals";
 import { useSession } from "../../store/session";
 import { useDiscoveryLocation } from "./useLocation";
@@ -116,13 +115,11 @@ export function ExploreScreen() {
   const rows = query.data?.pages.flatMap((p) => p.rows) ?? [];
   const header = (
     <>
-      <View style={local.heading}>
-        <View>
-          <Text style={local.context}>DISCOVER</Text>
-          <Title>Explore gyms</Title>
-        </View>
-        <Text style={local.location}>⌖ {applied.city || "Near you"}</Text>
-      </View>
+      <AppHeader
+        eyebrow="DISCOVER"
+        title="Explore gyms"
+        location={applied.city || (location.coordinates ? "Near you" : "Search by city")}
+      />
       <Input
         label="Search gyms or areas"
         value={search}
@@ -244,7 +241,7 @@ export function ExploreScreen() {
     </>
   );
   return (
-    <Screen scroll={false}>
+    <Screen top scroll={false}>
       <FlatList
         ListHeaderComponent={header}
         keyboardShouldPersistTaps="handled"
@@ -271,23 +268,5 @@ export function ExploreScreen() {
 }
 
 const local = StyleSheet.create({
-  heading: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  context: {
-    fontSize: 11,
-    letterSpacing: 1.8,
-    fontWeight: "800",
-    color: palette.accent,
-  },
-  location: {
-    fontSize: 13,
-    color: palette.muted,
-    fontWeight: "700",
-    paddingBottom: 8,
-  },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginVertical: 2 },
 });

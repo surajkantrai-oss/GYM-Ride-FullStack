@@ -4,6 +4,7 @@ const config: ExpoConfig = {
   name: "GYMRide",
   slug: "gymride-customer",
   version: "0.1.0",
+  icon: "./assets/brand/app-icon.png",
   orientation: "portrait",
   scheme: "gymride",
   userInterfaceStyle: "light",
@@ -14,8 +15,23 @@ const config: ExpoConfig = {
       ? { NSAppTransportSecurity: { NSAllowsLocalNetworking: true } }
       : {},
   },
-  android: { package: "com.gymride.customer" },
+  android: {
+    package: "com.gymride.customer",
+    adaptiveIcon: {
+      foregroundImage: "./assets/brand/splash-mark.png",
+      backgroundColor: "#F6F5EF",
+    },
+  },
   plugins: [
+    [
+      "expo-splash-screen",
+      {
+        image: "./assets/brand/splash-mark.png",
+        imageWidth: 180,
+        resizeMode: "contain",
+        backgroundColor: "#F6F5EF",
+      },
+    ],
     "expo-secure-store",
     "expo-notifications",
     [

@@ -10,21 +10,18 @@ import {
   type TextInputProps,
   type ImageSourcePropType,
 } from "react-native";
+import { createContext, useContext } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { errorMessage } from "../utils/domain";
-export const palette = {
-  ink: "#18251F",
-  accent: "#147558",
-  accentDark: "#0A5540",
-  accentSoft: "#E4F3EC",
-  lime: "#C8EF62",
-  canvas: "#F5F5EF",
-  surface: "#FFFDF8",
-  muted: "#607168",
-  border: "#DEE4DC",
-  danger: "#A83D38",
-  warning: "#9B6811",
-};
+import { colors, palette, radius, shadows, spacing, typography } from "./theme";
+import { AppIcon } from "./AppIcon";
+export { palette } from "./theme";
+const ImageSurfaceContext = createContext(false);
+
+export function useImageSurface() {
+  return useContext(ImageSurfaceContext);
+}
+
 export function Screen({
   children,
   scroll = true,
@@ -41,36 +38,41 @@ export function Screen({
       }
       style={styles.screen}
     >
-      {scroll ? (
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          {children}
-        </ScrollView>
-      ) : (
-        <View style={[styles.content, { flex: 1 }]}>{children}</View>
-      )}
+      <ImageSurfaceContext.Provider value>
+        {scroll ? (
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            {children}
+          </ScrollView>
+        ) : (
+          <View style={[styles.content, { flex: 1 }]}>{children}</View>
+        )}
+      </ImageSurfaceContext.Provider>
     </SafeAreaView>
   );
 }
 export function Title({ children }: { children: React.ReactNode }) {
+  const onImage = useImageSurface();
   return (
-    <Text accessibilityRole="header" style={styles.title}>
+    <Text accessibilityRole="header" style={[styles.title, onImage && styles.titleOnImage]}>
       {children}
     </Text>
   );
 }
 export function SectionTitle({ children }: { children: React.ReactNode }) {
+  const onImage = useImageSurface();
   return (
-    <Text accessibilityRole="header" style={styles.sectionTitle}>
+    <Text accessibilityRole="header" style={[styles.sectionTitle, onImage && styles.titleOnImage]}>
       {children}
     </Text>
   );
 }
 export function Copy({ children }: { children: React.ReactNode }) {
-  return <Text style={styles.copy}>{children}</Text>;
+  const onImage = useImageSurface();
+  return <Text style={[styles.copy, onImage && styles.copyOnImage]}>{children}</Text>;
 }
 export function Card({
   children,
@@ -80,15 +82,17 @@ export function Card({
   tone?: "default" | "highlight" | "dark";
 }) {
   return (
-    <View
-      style={[
-        styles.card,
-        tone === "highlight" && styles.cardHighlight,
-        tone === "dark" && styles.cardDark,
-      ]}
-    >
-      {children}
-    </View>
+    <ImageSurfaceContext.Provider value={false}>
+      <View
+        style={[
+          styles.card,
+          tone === "highlight" && styles.cardHighlight,
+          tone === "dark" && styles.cardDark,
+        ]}
+      >
+        {children}
+      </View>
+    </ImageSurfaceContext.Provider>
   );
 }
 export function Badge({
@@ -139,12 +143,24 @@ export function GymCard({
   name,
   meta,
   detail,
+  status,
+  price,
+  tag,
+  amenities,
+  rating,
+  reviewCount,
   image,
   onPress,
 }: {
   name: string;
   meta: string;
   detail?: string;
+  status?: string;
+  price?: string;
+  tag?: string;
+  amenities?: string[];
+  rating?: number | null;
+  reviewCount?: number;
   image: ImageSourcePropType;
   onPress: () => void;
 }) {
@@ -155,8 +171,19 @@ export function GymCard({
       onPress={onPress}
       style={({ pressed }) => [styles.gymCard, pressed && styles.buttonPressed]}
     >
-      <Image source={image} style={styles.gymCardImage} />
+      <View style={styles.gymCardVisual}>
+        <Image source={image} resizeMode="cover" style={styles.gymCardImage} />
+      </View>
       <View style={styles.gymCardBody}>
+        {tag ? (
+          <View style={styles.gymCardTopRow}>
+            <View style={styles.gymCardTag}>
+              <AppIcon name="spark" size={11} color={colors.primaryPressed} filled />
+              <Text numberOfLines={1} style={styles.gymCardTagText}>{tag}</Text>
+            </View>
+            <View style={styles.gymCardHeart}><AppIcon name="heart" size={20} color={colors.textSecondary} /></View>
+          </View>
+        ) : null}
         <Text numberOfLines={2} style={styles.gymCardTitle}>
           {name}
         </Text>
@@ -168,7 +195,21 @@ export function GymCard({
             {detail}
           </Text>
         ) : null}
-        <Text style={styles.gymCardLink}>View gym →</Text>
+        {amenities?.length ? (
+          <View style={styles.gymCardAmenities}>
+            {amenities.slice(0, 3).map((amenity) => (
+              <View key={amenity} style={styles.gymCardAmenity}><Text numberOfLines={1} style={styles.gymCardAmenityText}>{amenity}</Text></View>
+            ))}
+          </View>
+        ) : null}
+        <View style={styles.gymCardFooter}>
+          <View style={styles.gymCardFooterCopy}>
+            {status ? <Text numberOfLines={1} style={styles.gymCardStatus}>{status}</Text> : null}
+            {rating != null ? <Text numberOfLines={1} style={styles.gymCardRating}>★ {rating.toFixed(1)}{reviewCount != null ? <Text style={styles.gymCardReviews}> ({reviewCount} reviews)</Text> : null}</Text> : null}
+            {price ? <Text numberOfLines={1} style={styles.gymCardPrice}>{price}</Text> : null}
+          </View>
+          <View style={styles.gymCardLinkButton}><Text style={styles.gymCardLink}>View  →</Text></View>
+        </View>
       </View>
     </Pressable>
   );
@@ -177,11 +218,13 @@ export function Button({
   label,
   onPress,
   disabled = false,
+  loading = false,
   variant,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  loading?: boolean;
   variant?: "primary" | "secondary" | "ghost" | "danger";
 }) {
   const resolvedVariant =
@@ -195,32 +238,37 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
+      accessibilityState={{ disabled: disabled || loading }}
+      disabled={disabled || loading}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
         styles[`button_${resolvedVariant}`],
         pressed && styles.buttonPressed,
-        disabled && { opacity: 0.45 },
+        (disabled || loading) && { opacity: 0.48 },
       ]}
     >
-      <Text
-        style={[
-          styles.buttonText,
-          resolvedVariant !== "primary" && styles.buttonSecondaryText,
-          resolvedVariant === "danger" && styles.buttonDangerText,
-        ]}
-      >
-        {label}
-      </Text>
+      {loading ? (
+        <ActivityIndicator color={resolvedVariant === "primary" ? colors.white : colors.primary} />
+      ) : (
+        <Text
+          style={[
+            styles.buttonText,
+            resolvedVariant !== "primary" && styles.buttonSecondaryText,
+            resolvedVariant === "danger" && styles.buttonDangerText,
+          ]}
+        >
+          {label}
+        </Text>
+      )}
     </Pressable>
   );
 }
 export function Input({ label, ...props }: TextInputProps & { label: string }) {
+  const onImage = useImageSurface();
   return (
     <View>
-      <Text style={styles.inputLabel}>{label}</Text>
+      <Text style={[styles.inputLabel, onImage && styles.inputLabelOnImage]}>{label}</Text>
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor={palette.muted}
@@ -243,10 +291,12 @@ export function State({
 }) {
   if (loading)
     return (
-      <View accessibilityLabel="Loading" style={styles.stateCard}>
-        <ActivityIndicator color={palette.accent} />
-        <Text style={styles.stateTitle}>Getting things ready…</Text>
-      </View>
+      <ImageSurfaceContext.Provider value={false}>
+        <View accessibilityLabel="Loading" style={styles.stateCard}>
+          <ActivityIndicator color={palette.accent} />
+          <Text style={styles.stateTitle}>Getting things ready…</Text>
+        </View>
+      </ImageSurfaceContext.Provider>
     );
   if (error)
     return (
@@ -259,51 +309,55 @@ export function State({
     );
   if (empty)
     return (
-      <View style={styles.emptyCard}>
-        <Text style={styles.emptyIcon}>◇</Text>
-        <Text style={styles.stateTitle}>Nothing here yet</Text>
-        <Copy>Try another date, search, or filter.</Copy>
-      </View>
+      <ImageSurfaceContext.Provider value={false}>
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyIcon}>◇</Text>
+          <Text style={styles.stateTitle}>Nothing here yet</Text>
+          <Copy>Try another date, search, or filter.</Copy>
+        </View>
+      </ImageSurfaceContext.Provider>
     );
   return null;
 }
 export const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.canvas },
+  screen: { flex: 1, backgroundColor: "transparent" },
   content: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 36,
-    gap: 14,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing["3xl"],
+    gap: spacing.md,
   },
   title: {
-    fontSize: 31,
-    lineHeight: 36,
-    letterSpacing: -0.8,
-    fontWeight: "800",
+    ...typography.heading1,
     color: palette.ink,
   },
+  titleOnImage: {
+    color: colors.white,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 5,
+  },
   sectionTitle: {
-    fontSize: 21,
-    lineHeight: 27,
-    letterSpacing: -0.35,
-    fontWeight: "800",
+    ...typography.heading2,
     color: palette.ink,
     marginTop: 8,
   },
-  copy: { fontSize: 15, color: palette.muted, lineHeight: 22 },
+  copy: { ...typography.bodySmall, color: palette.muted },
+  copyOnImage: {
+    color: "#E0EEE7",
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
   card: {
     padding: 18,
     backgroundColor: palette.surface,
-    borderRadius: 22,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: palette.border,
     gap: 11,
     marginBottom: 6,
-    shadowColor: "#173328",
-    shadowOffset: { width: 0, height: 7 },
-    shadowOpacity: 0.07,
-    shadowRadius: 16,
-    elevation: 2,
+    ...shadows.card,
   },
   cardHighlight: {
     backgroundColor: palette.accentSoft,
@@ -311,8 +365,8 @@ export const styles = StyleSheet.create({
   },
   cardDark: { backgroundColor: palette.ink, borderColor: palette.ink },
   button: {
-    minHeight: 50,
-    borderRadius: 14,
+    minHeight: 56,
+    borderRadius: radius.button,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
@@ -344,6 +398,12 @@ export const styles = StyleSheet.create({
     color: palette.ink,
     fontWeight: "700",
     marginBottom: 7,
+  },
+  inputLabelOnImage: {
+    color: colors.white,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   input: {
     minHeight: 50,
@@ -420,25 +480,35 @@ export const styles = StyleSheet.create({
   chipTextSelected: { color: "#FFFFFF" },
   gymCard: {
     flexDirection: "row",
-    minHeight: 142,
+    minHeight: 144,
+    alignItems: "center",
     backgroundColor: palette.surface,
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 22,
+    borderRadius: radius.card,
     overflow: "hidden",
     marginBottom: 12,
-    shadowColor: "#173328",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.07,
-    shadowRadius: 14,
-    elevation: 2,
+    ...shadows.card,
   },
-  gymCardImage: {
-    width: 132,
-    alignSelf: "stretch",
+  gymCardVisual: {
+    width: 124,
+    aspectRatio: 0.88,
+    alignSelf: "center",
+    marginLeft: 8,
+    borderRadius: 17,
+    overflow: "hidden",
     backgroundColor: palette.accentSoft,
   },
-  gymCardBody: { flex: 1, padding: 14, gap: 5, justifyContent: "center" },
+  gymCardImage: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: palette.accentSoft,
+  },
+  gymCardBody: { flex: 1, minHeight: 144, padding: 14, gap: 5, justifyContent: "center" },
+  gymCardTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 4 },
+  gymCardTag: { maxWidth: "82%", flexDirection: "row", alignItems: "center", gap: 3, borderRadius: radius.round, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.primaryMuted },
+  gymCardTagText: { color: colors.primaryPressed, fontSize: 10, lineHeight: 13, fontWeight: "800" },
+  gymCardHeart: { width: 30, height: 30, marginTop: -5, marginRight: -5, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(246,245,239,0.92)" },
   gymCardTitle: {
     color: palette.ink,
     fontSize: 17,
@@ -448,14 +518,24 @@ export const styles = StyleSheet.create({
   },
   gymCardMeta: { color: palette.muted, fontSize: 13, lineHeight: 18 },
   gymCardDetail: {
-    color: palette.warning,
+    color: palette.muted,
     fontSize: 12,
     lineHeight: 17,
-    fontWeight: "700",
+    fontWeight: "600",
   },
+  gymCardAmenities: { flexDirection: "row", flexWrap: "nowrap", gap: 4 },
+  gymCardAmenity: { maxWidth: 78, borderRadius: radius.round, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: colors.background },
+  gymCardAmenityText: { color: colors.textSecondary, fontSize: 9, lineHeight: 12, fontWeight: "700" },
+  gymCardFooter: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8, marginTop: 2 },
+  gymCardFooterCopy: { flex: 1, gap: 1 },
+  gymCardStatus: { color: palette.accent, fontSize: 11, lineHeight: 15, fontWeight: "800" },
+  gymCardPrice: { color: palette.ink, fontSize: 13, lineHeight: 17, fontWeight: "900" },
+  gymCardRating: { color: colors.primaryPressed, fontSize: 12, lineHeight: 16, fontWeight: "900" },
+  gymCardReviews: { color: colors.textSecondary, fontWeight: "500" },
+  gymCardLinkButton: { borderRadius: radius.round, backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 8 },
   gymCardLink: {
-    color: palette.accent,
-    fontSize: 13,
+    color: colors.white,
+    fontSize: 12,
     fontWeight: "800",
     marginTop: 3,
   },

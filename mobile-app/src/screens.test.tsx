@@ -1,7 +1,9 @@
 import React, { type ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
-import { State } from "./components/ui";
+import { GymCard, State } from "./components/ui";
+import { OtpInput } from "./components/auth-controls";
+import { OnboardingScreen } from "./features/onboarding/OnboardingScreen";
 import { PlanScreen } from "./features/plans/PlanScreen";
 import { SlotsScreen } from "./features/slots/SlotsScreen";
 import { ReviewScreen } from "./features/bookings/ReviewScreen";
@@ -58,6 +60,7 @@ vi.mock("react-native", () => ({
   Switch: "Switch",
   RefreshControl: "RefreshControl",
   StyleSheet: { create: (value: unknown) => value, absoluteFill: {} },
+  useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   Alert: { alert: vi.fn() },
   Linking: { openSettings: vi.fn() },
   FlatList: ({
@@ -84,7 +87,7 @@ vi.mock("react-native", () => ({
       ),
     ),
 }));
-vi.mock("./components/gym-visuals", () => ({ gymVisual: () => 1, heroVisual: 1 }));
+vi.mock("./components/gym-visuals", () => ({ gymVisual: () => 1, heroVisual: 1, onboardingVisuals: [1, 2, 3] }));
 vi.mock("@react-navigation/native", () => ({
   useNavigation: () => ({ navigate: vi.fn() }),
 }));
@@ -98,6 +101,13 @@ vi.mock("./features/discovery/useLocation", () => ({
 }));
 vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeArea" }));
 vi.mock("react-native-qrcode-svg", () => ({ default: "QRCode" }));
+vi.mock("react-native-svg", () => ({
+  default: "Svg",
+  Circle: "Circle",
+  Line: "Line",
+  Path: "Path",
+  Rect: "Rect",
+}));
 vi.mock("expo-crypto", () => ({ randomUUID: mocks.uuid }));
 vi.mock("./features/notifications/push", () => ({ registerForPush: vi.fn(), unregisterPushOnLogout: vi.fn() }));
 vi.mock("./store/session", () => ({
@@ -173,6 +183,21 @@ afterEach(async () => {
   if (tree) await act(async () => tree.unmount());
 });
 describe("shared screen states", () => {
+  it("keeps gym imagery inside a bounded cover container", async () => {
+    await render(<GymCard name="Gym" meta="Bhopal" image={1} onPress={vi.fn()} />);
+    expect(text()).toContain('"aspectRatio":0.88');
+    expect(tree.root.findByType("Image" as React.ElementType).props.resizeMode).toBe("cover");
+  });
+  it("renders pasted OTP values as six individual slots", async () => {
+    await render(<OtpInput value="123456" onChange={vi.fn()} />);
+    for (const digit of "123456") expect(text()).toContain(`\"${digit}\"`);
+  });
+  it("renders the first-install onboarding journey", async () => {
+    await render(<OnboardingScreen onComplete={vi.fn()} />);
+    expect(text()).toContain("Your workout");
+    expect(button("Skip onboarding")).toBeDefined();
+    expect(button("Next onboarding page")).toBeDefined();
+  });
   it("renders discovery loading", async () => {
     mocks.query.isLoading = true;
     await render(<ExploreScreen />);

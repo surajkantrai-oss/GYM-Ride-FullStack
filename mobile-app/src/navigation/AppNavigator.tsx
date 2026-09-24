@@ -1,12 +1,15 @@
 import { useEffect } from "react";
-import { Text } from "react-native";
-import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
+import { StyleSheet, Text, View } from "react-native";
+import { DefaultTheme, NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { RootStack } from "./types";
 import { queryClient, useSession } from "../store/session";
 import { Screen, State, palette } from "../components/ui";
+import { AppIcon, type AppIconName } from "../components/AppIcon";
+import { colors, shadows, spacing, typography } from "../components/theme";
 import { LoginScreen } from "../features/auth/LoginScreen";
 import { HomeScreen } from "../features/home/HomeScreen";
 import { ExploreScreen } from "../features/discovery/ExploreScreen";
@@ -25,9 +28,15 @@ import { NotificationsScreen } from "../features/notifications/NotificationsScre
 import { FlexScreen } from "../features/flex/FlexScreen";
 import { PreferencesScreen } from "../features/recommendations/PreferencesScreen";
 import { safeNotificationRoute } from "../features/notifications/routing";
+import { useOnboarding } from "../store/onboarding";
+import { OnboardingScreen } from "../features/onboarding/OnboardingScreen";
 const Stack = createNativeStackNavigator<RootStack>();
 const Tabs = createBottomTabNavigator();
 const navigationRef = createNavigationContainerRef<RootStack>();
+const transparentNavigationTheme = {
+  ...DefaultTheme,
+  colors: { ...DefaultTheme.colors, background: "transparent" },
+};
 function openPushData(data: unknown) {
   if (!navigationRef.isReady()) return;
   const route = safeNotificationRoute(data);
@@ -39,18 +48,26 @@ function openPushData(data: unknown) {
   else navigationRef.navigate("Notifications");
 }
 function MainTabs() {
-  const icons: Record<string, string> = { Home: "⌂", Explore: "⌕", Bookings: "▣", Profile: "○" };
+  const insets = useSafeAreaInsets();
+  const icons: Record<string, AppIconName> = { Home: "home", Explore: "compass", Bookings: "calendar", Profile: "user" };
   return (
     <Tabs.Navigator
       screenOptions={({ route }) => ({
         tabBarActiveTintColor: palette.accent,
         tabBarInactiveTintColor: palette.muted,
-        tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 19, fontWeight: "800" }}>{icons[route.name]}</Text>,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "700", marginTop: 1 },
-        tabBarStyle: { height: 72, paddingTop: 8, paddingBottom: 10, backgroundColor: palette.surface, borderTopColor: palette.border },
-        headerStyle: { backgroundColor: palette.canvas },
-        headerShadowVisible: false,
-        headerTitleStyle: { color: palette.ink, fontWeight: "800" },
+        tabBarIcon: ({ color, focused }) => (
+          <View style={[navigatorStyles.tabIcon, focused && navigatorStyles.tabIconActive]}>
+            <AppIcon name={icons[route.name]!} size={26} color={focused ? colors.white : color} filled={focused} />
+          </View>
+        ),
+        tabBarLabelStyle: navigatorStyles.tabLabel,
+        tabBarItemStyle: navigatorStyles.tabItem,
+        sceneStyle: navigatorStyles.scene,
+        tabBarStyle: [
+          navigatorStyles.tabBar,
+          { height: 76 + Math.max(insets.bottom, 8), paddingBottom: Math.max(insets.bottom, 8) },
+        ],
+        headerShown: false,
       })}
     >
       <Tabs.Screen name="Home" component={HomeScreen} />
@@ -62,6 +79,7 @@ function MainTabs() {
 }
 export function AppNavigator() {
   const { user, restoring } = useSession();
+  const onboarding = useOnboarding();
   useEffect(() => {
     if (!user) return;
     const received = Notifications.addNotificationReceivedListener(() => {
@@ -71,15 +89,22 @@ export function AppNavigator() {
     const tapped = Notifications.addNotificationResponseReceivedListener((response) => openPushData(response.notification.request.content.data));
     return () => { received.remove(); tapped.remove(); };
   }, [user?.id]);
-  if (restoring)
+  if (restoring || onboarding.restoring)
     return (
-      <Screen>
+      <Screen top scroll={false}>
+        <View style={navigatorStyles.boot}>
+          <View style={navigatorStyles.bootLogo}><Text style={navigatorStyles.bootLogoText}>GR</Text></View>
+          <Text style={navigatorStyles.bootBrand}>GYMRide</Text>
+          <Text style={navigatorStyles.bootLine}>Find. Fit. Belong.</Text>
+        </View>
         <State loading />
       </Screen>
     );
+  if (onboarding.shouldShow)
+    return <OnboardingScreen onComplete={onboarding.complete} />;
   if (!user) return <LoginScreen />;
   return (
-    <NavigationContainer ref={navigationRef} onReady={() => {
+    <NavigationContainer theme={transparentNavigationTheme} ref={navigationRef} onReady={() => {
       void Notifications.getLastNotificationResponseAsync().then((response) => {
         if (response) {
           openPushData(response.notification.request.content.data);
@@ -87,7 +112,7 @@ export function AppNavigator() {
         }
       });
     }}>
-      <Stack.Navigator screenOptions={{ headerTintColor: palette.ink, headerStyle: { backgroundColor: palette.canvas }, headerShadowVisible: false, headerTitleStyle: { fontWeight: "800" } }}>
+      <Stack.Navigator screenOptions={{ contentStyle: navigatorStyles.scene, headerTintColor: palette.ink, headerStyle: { backgroundColor: palette.canvas }, headerShadowVisible: false, headerTitleStyle: { fontWeight: "800" } }}>
         <Stack.Screen
           name="Main"
           component={MainTabs}
@@ -113,3 +138,25 @@ export function AppNavigator() {
     </NavigationContainer>
   );
 }
+
+const navigatorStyles = StyleSheet.create({
+  scene: { backgroundColor: "transparent" },
+  tabBar: {
+    paddingTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    ...shadows.bottomNavigation,
+  },
+  tabItem: { minHeight: 62 },
+  tabLabel: { fontSize: 12, lineHeight: 15, fontWeight: "700", marginTop: 4 },
+  tabIcon: { width: 50, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  tabIconActive: { backgroundColor: colors.primary },
+  boot: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.sm },
+  bootLogo: { width: 68, height: 68, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary },
+  bootLogoText: { fontSize: 22, fontWeight: "900", color: colors.white },
+  bootBrand: { ...typography.heading1, color: colors.textPrimary },
+  bootLine: { ...typography.bodySmall, color: colors.textSecondary },
+});

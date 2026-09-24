@@ -16,6 +16,7 @@ import {
   palette,
 } from "../../components/ui";
 import { gymVisual } from "../../components/gym-visuals";
+import { colors } from "../../components/theme";
 import { useSession } from "../../store/session";
 import { money } from "../../utils/domain";
 export function GymScreen({
@@ -204,20 +205,33 @@ const local = StyleSheet.create({
   heroBadge: { position: "absolute", left: 16, bottom: 16 },
   meta: { flexDirection: "row", alignItems: "center", gap: 12 },
   rating: { color: palette.warning, fontWeight: "800", fontSize: 15 },
-  metaText: { color: palette.muted, fontSize: 13 },
+  metaText: {
+    color: "#E0EEE7",
+    fontSize: 13,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
   tabs: {
     flexDirection: "row",
     justifyContent: "space-between",
     borderBottomWidth: 1,
     borderBottomColor: palette.border,
   },
-  tab: { paddingVertical: 12, color: palette.muted, fontSize: 13 },
+  tab: {
+    paddingVertical: 12,
+    color: "#E0EEE7",
+    fontSize: 13,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
   tabActive: {
     paddingVertical: 12,
-    color: palette.accent,
+    color: colors.primaryMuted,
     fontWeight: "800",
     borderBottomWidth: 2,
-    borderBottomColor: palette.accent,
+    borderBottomColor: colors.primaryMuted,
     fontSize: 13,
   },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

@@ -12,9 +12,9 @@ import {
   Copy,
   Screen,
   State,
-  Title,
   palette,
 } from "../../components/ui";
+import { ScreenHeader } from "../../components/headers";
 import { useSession } from "../../store/session";
 import { gymVisual } from "../../components/gym-visuals";
 import { bookingGroup, money } from "../../utils/domain";
@@ -34,8 +34,8 @@ export function BookingsScreen() {
     (booking) => bookingGroup(booking.status) === group,
   );
   return (
-    <Screen scroll={false}>
-      <Title>Your workouts</Title>
+    <Screen top scroll={false}>
+      <ScreenHeader title="Your workouts" subtitle="Bookings, passes and upcoming sessions" />
       <View style={local.tabs}>
         {(["Upcoming", "Past", "Other"] as const).map((item) => (
           <Chip

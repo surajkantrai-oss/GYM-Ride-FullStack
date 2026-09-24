@@ -19,3 +19,4 @@ export function gymVisual(key: string): ImageSourcePropType {
 }
 
 export const heroVisual = visuals[0]!;
+export const onboardingVisuals = [visuals[2]!, visuals[1]!, visuals[0]!] as const;

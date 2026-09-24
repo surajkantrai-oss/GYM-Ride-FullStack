@@ -9,9 +9,9 @@ import {
   Screen,
   SectionTitle,
   State,
-  Title,
   palette,
 } from "../../components/ui";
+import { AppHeader } from "../../components/headers";
 import { useSession } from "../../store/session";
 import {
   registerForPush,
@@ -51,8 +51,13 @@ export function ProfileScreen() {
     },
   });
   return (
-    <Screen>
-      <Title>Your profile</Title>
+    <Screen top>
+      <AppHeader
+        eyebrow="ACCOUNT"
+        title="Your profile"
+        subtitle="Personal details, preferences and security"
+        avatarLabel={query.data?.firstName || "G"}
+      />
       <State
         loading={query.isLoading}
         error={query.error || update.error}
