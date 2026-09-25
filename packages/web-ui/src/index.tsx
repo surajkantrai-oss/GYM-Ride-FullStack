@@ -249,21 +249,27 @@ export function LoginScreen({
   return (
     <main className="login-page">
       <section className="login-brand">
-        <span className="eyebrow">Operations console</span>
+        <div className="login-logo-lockup">
+          <span className="brand-mark">GR</span>
+          <span>
+            <strong>GYMRide</strong>
+            <small>Find. Fit. Belong.</small>
+          </span>
+        </div>
+        <span className="eyebrow">{appName} workspace</span>
         <h1>
-          Move better.
+          Find your edge.
           <br />
-          Run smarter.
+          <em>Lead the movement.</em>
         </h1>
         <p>
-          {appName} gives your team a clear view of every gym, branch, and
-          decision.
+          One premium workspace for every gym, branch, booking and decision.
         </p>
       </section>
       <section className="login-card" aria-labelledby="login-title">
         <div className="brand-mark">GR</div>
-        <p className="eyebrow">GYMRide</p>
-        <h2 id="login-title">Sign in to {appName}</h2>
+        <p className="eyebrow">GYMRide {appName}</p>
+        <h2 id="login-title">Welcome back.</h2>
         <p className="muted">
           {step === "phone"
             ? "Use the mobile number attached to your account."
@@ -351,6 +357,18 @@ const navIcons: Record<string, string> = {
   "+": "+",
 };
 
+const routeContext: Record<string, { title: string; detail: string }> = {
+  dashboard: { title: "Dashboard", detail: "Live workspace overview" },
+  gyms: { title: "Gyms", detail: "Manage your fitness network" },
+  flex: { title: "GYMRide Flex", detail: "Membership operations" },
+  finance: { title: "Finance", detail: "Earnings and settlements" },
+  bookings: { title: "Bookings", detail: "Reservations and attendance" },
+  reviews: { title: "Reviews", detail: "Member feedback" },
+  notifications: { title: "Notifications", detail: "Updates and activity" },
+  "check-ins": { title: "Check-ins", detail: "Secure visit verification" },
+  profile: { title: "Profile", detail: "Account and security" },
+};
+
 export function AppShell({
   children,
   appName,
@@ -363,15 +381,19 @@ export function AppShell({
   const { user, logout } = useAuth();
   const currentPath =
     typeof window === "undefined" ? "" : window.location.pathname;
+  const routeKey = currentPath.split("/").filter(Boolean)[0] ?? "dashboard";
+  const context = routeContext[routeKey] ?? routeContext.dashboard;
   return (
-    <div className="app-frame">
+    <div className={`app-frame app-frame-${appName.toLowerCase()}`}>
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <aside className="sidebar">
         <a className="brand" href="/dashboard">
           <span className="brand-mark">GR</span>
           <span>
-            GYMRide<small>{appName}</small>
+            GYMRide<small>Find. Fit. Belong.</small>
           </span>
         </a>
+        <p className="sidebar-console">{appName} console</p>
         <nav aria-label="Primary navigation">
           {nav.map((item) => (
             <a
@@ -400,14 +422,21 @@ export function AppShell({
       <div className="main-column">
         <header className="desktop-header">
           <div>
-            <strong>{appName} workspace</strong>
-            <small>Live operations</small>
+            <strong>{context.title}</strong>
+            <small>{context.detail}</small>
           </div>
-          <div className="desktop-header-user" aria-label="Signed in user">
+          <div className="desktop-header-actions">
+            {appName === "Partner" && (
+              <a className="header-icon" href="/notifications" aria-label="Notifications">
+                <span aria-hidden="true">●</span>
+              </a>
+            )}
+            <div className="desktop-header-user" aria-label="Signed in user">
             <span>{displayName(user).slice(0, 1).toUpperCase()}</span>
             <div>
               <strong>{displayName(user)}</strong>
               <small>{user?.roles.join(" · ")}</small>
+            </div>
             </div>
           </div>
         </header>
@@ -416,7 +445,7 @@ export function AppShell({
             GYMRide · {appName}
           </a>
         </header>
-        <main className="page">{children}</main>
+        <main className="page" id="main-content">{children}</main>
       </div>
     </div>
   );

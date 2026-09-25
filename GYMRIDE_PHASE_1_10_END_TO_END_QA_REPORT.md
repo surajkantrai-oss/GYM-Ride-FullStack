@@ -38,12 +38,12 @@ Several **business-flow defects** stop a real new partner from getting to "live 
 | | Before QA | After QA |
 |---|---|---|
 | Branch | `main` | `main` |
-| HEAD | `aae80892938ad8e154324d917cbcdefb0cecad4f` | `aae80892938ad8e154324d917cbcdefb0cecad4f` |
+| HEAD | `aae80892938ad8e154324d917cbcdefb0cecad4f` | `824bc8d063457d0515995fb216a7e6673ac3e3cc` (see note) |
 | Staged changes | none (0 lines) | none (0 lines) |
-| `git diff` sha1 | `beba652152158f24a4f22ad373a7132b0f3139da` | __AFTER_DIFF__ |
-| `git status --short` | 19 modified and 5 untracked paths, all **pre-existing** (UI work in admin, partner, mobile and web-ui) | identical, plus this report file |
+| `git diff` sha1 | `beba652152158f24a4f22ad373a7132b0f3139da` | empty (`da39a3ee…`) after the user's commit; afterwards only this report differs |
+| `git status --short` | 19 modified and 5 untracked paths, all **pre-existing** (UI work in admin, partner, mobile and web-ui) | clean, except this report (modified after the commit) |
 
-The pre-existing working-tree changes were present before QA started. They were not touched, staged or committed.
+**Note:** At 15:10 IST, during the audit, the repository owner (Surajkant Rai) made commit `824bc8d` "Design updated , data added". It contains all the pre-existing working-tree changes **and an in-progress draft of this report**. QA made no commits, staged nothing, and edited no source file. The only file QA wrote is this report.
 
 ```
 SOURCE CODE MODIFIED BY QA: NO
@@ -203,7 +203,8 @@ Not creatable: a second or third partner (GR-QA-001), plan ARCHIVED status (no t
 | M20 | Notification badge | PASS | 8, then 11: matches the API unread count |
 | M21 | Profile | PASS | Name, email and notification toggles render; server validates length and email |
 | M22 | Reviews empty state | PASS / P3 | Copy says "Try another date, search, or filter." on a reviews list |
-| M23 | QR / OTP check-in, completion, review on mobile | __M23__ |
+| M23 | Check-in screen | PASS | Before the window: "credential becomes available when the check-in window opens"; at 1:45 PM: CHECK IN AVAILABLE, then Generate secure QR (QR plus 180 s countdown) and Use fallback OTP |
+| M24 | Upcoming list ordering | FAIL (P3) | 8 PM booking listed before 2 PM; an expired pending booking is listed between them (GR-QA-029) |
 
 ## 8. End-to-End Flow Results
 
@@ -223,13 +224,13 @@ Not creatable: a second or third partner (GR-QA-001), plan ARCHIVED status (no t
 | Payment | PASS | Dev provider; signature enforced; idempotent |
 | QR check-in | PASS | Mobile shows the window 1:45–2:30 PM and generates a QR (180 s countdown). Regenerate invalidates the old token; tampered → 400; customer calling verify → 403; 3 concurrent verifies → 1×CHECKED_IN, 2×409; reuse → 409; QR after check-in → 409; too early → 409 CHECK_IN_TOO_EARLY; membership (no slot) → 409 |
 | OTP check-in | PASS | Partner UI 'Fallback OTP' → 'Check-in verified · Qa Customer Four · CHECKED IN'. Wrong OTP → 400; OTP from another booking → 400; reuse → 400; resend inside 30 s → 429 |
-| Completion | __COMPLETE__ |
-| No-show | __NOSHOW__ |
+| Completion | PASS | QR- and OTP-checked-in bookings → COMPLETED at slot end + 15 min (15:17 IST) |
+| No-show | PASS | Unchecked booking stayed CHECK_IN_AVAILABLE until noShowAt (15:00 IST), then NO_SHOW. Partner list reflects COMPLETED and NO_SHOW |
 | Cancellation (payment pending) | PASS | Capacity released |
 | Cancellation (confirmed) | NOT IMPLEMENTED | "Only payment-pending bookings can be cancelled in Phase 4" |
 | Refund (partial + full) | PASS | Ledger reversal entries correct |
 | Settlement → reversal | PASS | Partner summary updates |
-| Reviews | __REVIEW__ |
+| Reviews | PASS | Before completion → 409; rating 0, 6, 4.5 and 2001-char comment → 400; valid → 201; duplicate → 409; other customer → 404; NO_SHOW → 409; edit → 200; visible to public, partner and admin; admin HIDDEN removes it from public and the aggregate. REVIEW_AVAILABLE notification sent |
 | Notifications (customer) | PASS | BOOKING_CREATED / CONFIRMED / CANCELLED, PAYMENT_CONFIRMED, REFUND_COMPLETED |
 | Notifications (partner, gym lifecycle) | FAIL | GR-QA-008 |
 
@@ -333,6 +334,7 @@ Timezone: every surface rendered IST consistently. The API returns UTC ISO, and 
 - **GR-QA-026** Slot date is a free-text YYYY-MM-DD field.
 - **GR-QA-027** Plan transition errors reuse the `PLAN_INACTIVE` code for DRAFT→INACTIVE and ACTIVE→ACTIVE.
 - **GR-QA-028** Reviews empty state copy says "Try another date, search, or filter."
+- **GR-QA-029** Mobile Upcoming bookings are not sorted by slot time.
 
 ## 11. Security / RBAC Findings
 
@@ -414,4 +416,23 @@ No activation guidance after approval (002), generic or raw validation text (013
 
 ## 17. Final Launch Readiness Matrix
 
-__MATRIX__
+```
+Total scenarios executed: 176
+PASS:            131
+FAIL:             30   (includes partial/UX fails)
+BLOCKED:           4
+NOT IMPLEMENTED:   6
+NOT TESTABLE:      5
+
+P0 bugs: 1   (GR-QA-001)
+P1 bugs: 1   (GR-QA-002)
+P2 bugs: 15  (GR-QA-003, 003b, 004, 005, 006, 007, 008, 009, 010, 012, 013, 014, 016, plus the partner KPI and finance-picker gaps grouped under 014/022)
+P3 bugs: 16  (GR-QA-011, 015, 017–029)
+```
+
+**Working correctly (launch-grade):** OTP auth and session restore; RBAC and ownership isolation; gym submit, approve, reject and suspend state machine; branch, amenity and hour persistence; plan lifecycle and branch assignment; slot materialization and timezone; booking with capacity locking and idempotency; development payment capture; QR and OTP check-in with single-use tokens; completion and no-show automation; reviews and moderation; refunds, settlement, reversal, ledger and reconciliation (Partner and Admin reconcile exactly); customer notifications.
+
+**Has defects:** partner onboarding (P0); post-approval visibility (P1); slot listing of past slots and expiry status; mobile card layout and hours display; partner-panel validation feedback and slot-settings feedback; review-period editing loophole; partner gym-lifecycle notifications.
+
+**Recommendation:** Fix GR-QA-001 and GR-QA-002 before any partner pilot. Fix the P2 list before public customer launch.
+

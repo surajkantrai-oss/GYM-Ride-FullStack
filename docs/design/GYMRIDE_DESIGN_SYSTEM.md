@@ -2,7 +2,7 @@
 
 ## Direction
 
-GYMRide uses two related visual expressions. Customer mobile surfaces use a warm, active-lifestyle language (Concept 05): natural off-white canvas, deep gym green, energetic lime accents, generous rounded cards, and direct motivational copy. Admin and Partner portals use a contemporary operational SaaS language (Concept 04): restrained density, clear hierarchy, persistent navigation, compact controls, auditable tables, and semantic status indicators.
+GYMRide uses one premium fitness identity across purpose-built surfaces. Customer mobile establishes the brand: immersive gym photography, deep forest green, mint highlights, warm cream surfaces, generous rounding, and direct motivational copy. Admin and Partner translate that identity into a denser desktop SaaS workspace with persistent navigation, compact controls, auditable tables, and semantic status indicators.
 
 The systems share color meaning, spacing rhythm, typography hierarchy, control states, and accessibility behavior. No presentation component owns domain or API logic.
 
@@ -12,14 +12,16 @@ The systems share color meaning, spacing rhythm, typography hierarchy, control s
 
 | Token | Web | Mobile | Use |
 | --- | --- | --- | --- |
-| Ink | `#17211c` | `#18251f` | Primary text and dark surfaces |
-| Brand | `#0f7554` | `#147558` | Primary action and focus |
-| Brand dark | `#07543b` | `#0a5540` | Hover and emphasized green |
-| Lime | `#c9f25d` | `#c8ef62` | Energy accent, never body text |
-| Canvas | `#f6f7f4` | `#f5f5ef` | Application background |
-| Surface | `#ffffff` | `#fffdf8` | Cards and inputs |
-| Muted | `#68776f` | `#607168` | Secondary copy |
-| Danger | `#b23b3b` | `#a83d38` | Destructive/error states |
+| Ink | `#10241a` | `#18251f` | Primary text and dark surfaces |
+| Brand | `#08795a` | `#147558` | Primary action and focus |
+| Brand dark | `#0c4b36` | `#0a5540` | Hover and emphasized green |
+| Forest | `#071c13` | `#071c13` | Sidebar and photographic overlay |
+| Mint | `#c7efe0` | `#c7efe0` | Active states and supporting emphasis |
+| Lime | `#caf56b` | `#c8ef62` | Energy accent, never body text |
+| Canvas | `#f7f1e8` | `#f5f5ef` | Warm application workspace |
+| Surface | `#fffdf8` | `#fffdf8` | Cards and inputs |
+| Muted | `#66776e` | `#607168` | Secondary copy |
+| Danger | `#a33c37` | `#a83d38` | Destructive/error states |
 
 Status colors retain their semantic meaning across Payments, Booking, Check-in, Flex, Reviews, and Settlements: green for healthy/complete, amber for attention/in progress, red for failure/blocked, and neutral gray for inactive/hidden.
 
@@ -33,16 +35,16 @@ Status colors retain their semantic meaning across Payments, Booking, Check-in, 
 
 - Base spacing rhythm: 4, 8, 12, 16, 20, 24, 32.
 - Controls have at least 42px web and 50px mobile height.
-- Web surfaces use 10–24px radii; mobile cards use 22px.
+- Web controls use 12px radii, cards 20px, and large workspaces 28–30px; mobile cards use 22px.
 - Shadows are quiet and supplementary to borders, not the only boundary.
 
-Implemented radii are 10px for web controls, 16px for web cards, 24–28px for premium/hero surfaces, 14px for mobile controls, 22px for mobile cards, and fully rounded filter chips. The standard web shadow is `0 12px 32px rgba(18,37,30,.07)`; mobile cards use a 6–7px vertical offset with 7% forest opacity.
+The standard web card shadow is `0 10px 30px rgba(5,28,18,.09)` and floating surfaces use `0 24px 70px rgba(3,22,14,.20)`. Mobile cards use a 6–7px vertical offset with 7% forest opacity.
 
 ## Shared web components
 
 The `@gymride/web-ui` package owns the portal shell, authentication screen, page headers, fields, status badges, loading/empty/error states, confirmation dialogs, toasts, and shared finance workflows. Its CSS defines design tokens and responsive behavior.
 
-- `AppShell`: dark persistent desktop rail, active-route state, contextual top bar, mobile bottom rail.
+- `AppShell`: photographic application backdrop, frosted forest desktop rail, active-route state, contextual glass top bar, user identity, and compact responsive rail.
 - `PageHeader`: eyebrow, display title, description, and page action.
 - `StatusBadge`: server status text with semantic, non-color-only dot indicator.
 - `PageState` / `ErrorState`: consistent loading, permission, empty, and retry treatments.
@@ -63,11 +65,13 @@ It also provides `Chip` for compact friendly filters and `GymCard` for the appro
 
 Three local GYMRide-owned generic gym interiors are stored in each client asset surface as `gym-warm.jpg`, `gym-strength.jpg`, and `gym-airy.jpg`. A deterministic presentation helper selects a fallback from the entity ID. These files never alter gym records and are not represented as customer-uploaded media. Images use `cover` cropping and retain warm architectural light, forest/charcoal equipment, and natural materials consistent with Concept 05.
 
+The Admin and Partner shells use `gym-strength.jpg` once at the application root with a controlled forest overlay. Cream workspace surfaces remain approximately 92–94% opaque so the setting is recognizable without reducing text or table contrast. Login uses the same asset and separates brand storytelling from the authentication card on desktop.
+
 ## Shell dimensions and density
 
-- Desktop portal sidebar: 252px fixed/sticky rail.
-- Desktop context header: 70px.
-- Main content maximum width: 1440px with fluid 1.35–3rem padding.
+- Desktop portal sidebar: 256px fixed/sticky rail, collapsing to an 86px icon rail at 1100px.
+- Desktop context header: 72px floating glass surface.
+- Main content maximum width: 1460px inside a warm 28–30px workspace surface.
 - Compact KPI minimum width: 160px; cards pair the metric with a 34px icon tile.
 - Data tables retain a 680px safe minimum width and scroll horizontally below it.
 - At 800px the web rail becomes a bottom navigation and multi-column grids collapse.
