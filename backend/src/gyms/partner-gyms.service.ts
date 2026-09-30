@@ -5,6 +5,7 @@ import {
   GymStatus,
   MembershipStatus,
   Prisma,
+  RoleName,
 } from '@prisma/client';
 import { ApiErrorCode } from '../common/errors/api-error-code';
 import { pageMeta } from '../common/dto/pagination.dto';
@@ -37,12 +38,24 @@ export class PartnerGymsService {
   ) {}
   async create(user: AuthUser, dto: CreateGymDto): Promise<unknown> {
     return this.prisma.$transaction(async (tx) => {
+      const ownerRole = await tx.role.findUnique({ where: { name: RoleName.GYM_OWNER } });
+      if (!ownerRole)
+        throw new DomainException(
+          ApiErrorCode.INTERNAL_ERROR,
+          'Gym owner role is not configured',
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
       const gym = await tx.gym.create({
         data: { name: dto.name.trim(), description: dto.description?.trim(), ownerId: user.id },
         select: privateGymSelect,
       });
       await tx.gymMembership.create({
         data: { userId: user.id, gymId: gym.id, role: GymMembershipRole.OWNER },
+      });
+      await tx.userRole.upsert({
+        where: { userId_roleId: { userId: user.id, roleId: ownerRole.id } },
+        create: { userId: user.id, roleId: ownerRole.id },
+        update: {},
       });
       return gym;
     });

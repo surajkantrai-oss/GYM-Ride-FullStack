@@ -1,6 +1,6 @@
 # GYMRide
 
-GYMRide is a full-stack gym-access marketplace for customers who need day passes, term plans, or prepaid multi-city Flex access across participating gyms. The repository currently implements Phases 1–10: platform foundations, authentication and gym discovery, Admin and Partner portals, booking, financial workflows, the customer mobile app, secure check-in, reviews, notifications, GYMRide Flex / Hybrid Mode, and deterministic recommendations.
+GYMRide is a full-stack gym-access marketplace for customers who need day passes, term plans, or prepaid multi-city Flex access across participating gyms. The repository implements GYMRide Phases 1–10 and GymOS Phases 1–6: paid gym-scoped SaaS subscriptions, direct members, membership lifecycle, attendance, private member payments/dues, deterministic analytics, and controlled reminders.
 
 This is a development/sandbox implementation. It does not claim live payment or payout processing, physical-device push acceptance, cloud deployment, or app-store release.
 
@@ -35,9 +35,15 @@ The mobile project uses Expo prebuild. Generated `mobile-app/android` and `mobil
 - Persistent in-app notifications, per-device delivery records, provider abstraction and bounded retries
 - Prepaid multi-city Flex subscriptions, transactional usage reservation, check-in consumption and gym reimbursement
 - Deterministic 0–100 gym recommendations using PostGIS, published ratings, amenities, plans, availability, history and Flex eligibility
+- GymOS Phase 1 gym-scoped SaaS plans, fixed-period subscriptions, trials, commercial snapshots and backend feature entitlements
+- GymOS Phase 2 direct members, plan limits, lifecycle actions, CSV import, Partner management and Admin read-only oversight
+- GymOS Phase 3 gym-scoped membership plans, immutable member snapshots, scheduled activation, expiry, freeze/resume, cancellation, renewal, expiry dashboards and audited lifecycle history
+- GymOS Phase 4 direct-member manual/rotating-QR attendance, membership and branch eligibility, current presence, local-time summaries, audit and read-only Admin oversight
+- GymOS Phase 5 immutable membership charges, partial member payments, derived dues, receipts, reversals, reconciliation and read-only Admin oversight
+- GymOS Phase 6 timezone-safe ranged membership/attendance/finance/renewal analytics, server-segment reminder campaigns, shared quiet hours, persistent delivery history, and bounded BullMQ processing
 - Jest/Vitest, ESLint, strict TypeScript and Swagger/OpenAPI
 
-Start with the [system overview](docs/architecture/system-overview.md). Phase-specific references include [finance](docs/architecture/phase-5-finance.md), [mobile](docs/architecture/phase-6-mobile.md), [check-in](docs/architecture/phase-7-check-in.md), [reviews and notifications](docs/architecture/phase-8-reviews-notifications.md), [Flex / Hybrid Mode](docs/architecture/phase-9-flex-hybrid.md), and [deterministic recommendations](docs/architecture/phase-10-recommendations.md). The presentation layer is documented in the [GYMRide design system](docs/design/GYMRIDE_DESIGN_SYSTEM.md) and [UI/UX redesign guide](docs/design/UI_UX_REDESIGN.md).
+Start with the [system overview](docs/architecture/system-overview.md). Phase-specific references include [finance](docs/architecture/phase-5-finance.md), [reviews and notifications](docs/architecture/phase-8-reviews-notifications.md), [Flex](docs/architecture/phase-9-flex-hybrid.md), [recommendations](docs/architecture/phase-10-recommendations.md), [GymOS Phase 1](docs/architecture/gym-os-phase-1-saas-foundation.md), [GymOS Phase 2](docs/architecture/gym-os-phase-2-members.md), [GymOS Phase 3](docs/architecture/gym-os-phase-3-membership-lifecycle.md), [GymOS Phase 4 attendance](docs/architecture/gym-os-phase-4-attendance.md), [GymOS Phase 5 member finance](docs/architecture/gym-os-phase-5-member-finance.md), and [GymOS Phase 6 analytics/reminders](docs/architecture/gym-os-phase-6-analytics-reminders.md). The presentation layer is documented in the [GYMRide design system](docs/design/GYMRIDE_DESIGN_SYSTEM.md).
 
 ## Implemented phases
 
@@ -52,7 +58,9 @@ Start with the [system overview](docs/architecture/system-overview.md). Phase-sp
 9. GYMRide Flex / Hybrid Mode
 10. Deterministic recommendation engine
 
-Current validated baseline: 305 standard tests and 51 PostgreSQL/PostGIS runtime tests pass. Backend, Admin and Partner production builds pass; Android and iOS debug simulator builds install and launch locally.
+GymOS Phases 1–6 provide the SaaS foundation, direct member directory, membership lifecycle, attendance, direct-member payments/dues, deterministic analytics, and controlled reminders. CRM, AI advice, and live messaging providers are not implemented.
+
+Validation counts are recorded after each fresh phase run; use the commands below for the current machine. Customer mobile remains unchanged by GymOS Phase 6.
 
 The Admin and Partner portals use a shared contemporary SaaS shell, while the customer mobile app uses a warmer lifestyle-focused visual system. The redesign preserves all Phase 1–10 routes, API calls, validation, permissions, and business behavior.
 
@@ -82,6 +90,7 @@ Populate `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `OTP_HASH_SECRET`, and `CHEC
 PAYMENT_PROVIDER=development
 PUSH_PROVIDER=development
 NOTIFICATION_QUEUE_ENABLED=false
+GYMOS_REMINDER_QUEUE_ENABLED=false
 ```
 
 Razorpay requires its key ID, key secret, and webhook secret. Expo push requires an EAS project ID, native push credentials, `PUSH_PROVIDER=expo`, and physical-device acceptance. No `EXPO_PUBLIC_*` value should contain a secret.

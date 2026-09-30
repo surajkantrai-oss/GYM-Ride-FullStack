@@ -7,7 +7,8 @@ export type NotificationRoute =
   | { screen: 'Gym'; gymId: string }
   | { screen: 'Flex' }
   | { screen: 'PartnerReviews'; gymId: string }
-  | { screen: 'PartnerSettlement'; settlementId: string };
+  | { screen: 'PartnerSettlement'; settlementId: string }
+  | { screen: 'PartnerGymOs'; gymId: string };
 
 export interface NotificationIntent {
   userId: string;

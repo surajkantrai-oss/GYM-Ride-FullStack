@@ -1,15 +1,15 @@
 import type { OperatingHoursPeriod } from "@gymride/types";
 import { z } from "zod";
 
-export const phoneSchema = z.object({
-  phone: z
-    .string()
-    .trim()
-    .regex(
-      /^\+[1-9]\d{7,14}$/,
-      "Use international format, for example +919876543210",
-    ),
-});
+const internationalPhoneSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^\+[1-9]\d{7,14}$/,
+    "Use international format, for example +919876543210",
+  );
+
+export const phoneSchema = z.object({ phone: internationalPhoneSchema });
 
 export const otpSchema = phoneSchema.extend({
   otp: z
@@ -51,9 +51,31 @@ export const branchSchema = z.object({
   state: z.string().trim().min(2).max(100),
   postalCode: z.string().trim().min(3).max(20),
   country: z.string().trim().length(2).default("IN"),
-  latitude: z.coerce.number().min(-90).max(90).transform(String),
-  longitude: z.coerce.number().min(-180).max(180).transform(String),
-  phone: z.string().trim().optional().or(z.literal("")),
+  latitude: z
+    .string()
+    .trim()
+    .min(1, "Latitude is required")
+    .refine(
+      (value) => Number.isFinite(Number(value)) && Math.abs(Number(value)) <= 90,
+      "Enter a latitude between -90 and 90",
+    ),
+  longitude: z
+    .string()
+    .trim()
+    .min(1, "Longitude is required")
+    .refine(
+      (value) =>
+        Number.isFinite(Number(value)) && Math.abs(Number(value)) <= 180,
+      "Enter a longitude between -180 and 180",
+    ),
+  phone: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value === "" || /^\+[1-9]\d{7,14}$/.test(value),
+      "Use international format, for example +919876543210",
+    )
+    .optional(),
   email: z.union([z.literal(""), z.string().trim().email()]).optional(),
   timezone: z.string().trim().min(3).default("Asia/Kolkata"),
 });

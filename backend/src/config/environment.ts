@@ -44,6 +44,10 @@ export interface AppEnvironment {
   CHECK_IN_OTP_REQUEST_LIMIT: number;
   CHECK_IN_OTP_REQUEST_WINDOW_SECONDS: number;
   CHECK_IN_QUEUE_ENABLED: boolean;
+  GYMOS_RECONCILIATION_ENABLED: boolean;
+  GYMOS_REMINDER_QUEUE_ENABLED: boolean;
+  GYMOS_ATTENDANCE_QR_TTL_SECONDS: number;
+  GYMOS_ATTENDANCE_QR_RETENTION_HOURS: number;
 }
 
 function text(value: unknown, fallback: string): string {
@@ -213,5 +217,17 @@ export function validateEnvironment(raw: Record<string, unknown>): AppEnvironmen
       3600,
     ),
     CHECK_IN_QUEUE_ENABLED: boolean(raw.CHECK_IN_QUEUE_ENABLED, nodeEnv === 'production'),
+    GYMOS_RECONCILIATION_ENABLED: boolean(raw.GYMOS_RECONCILIATION_ENABLED, true),
+    GYMOS_REMINDER_QUEUE_ENABLED: boolean(raw.GYMOS_REMINDER_QUEUE_ENABLED, nodeEnv === 'production'),
+    GYMOS_ATTENDANCE_QR_TTL_SECONDS: integer(
+      raw.GYMOS_ATTENDANCE_QR_TTL_SECONDS,
+      'GYMOS_ATTENDANCE_QR_TTL_SECONDS',
+      60,
+    ),
+    GYMOS_ATTENDANCE_QR_RETENTION_HOURS: integer(
+      raw.GYMOS_ATTENDANCE_QR_RETENTION_HOURS,
+      'GYMOS_ATTENDANCE_QR_RETENTION_HOURS',
+      24,
+    ),
   };
 }

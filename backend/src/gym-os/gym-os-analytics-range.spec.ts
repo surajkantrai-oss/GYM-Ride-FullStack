@@ -1,0 +1,8 @@
+import { DateTime } from 'luxon';
+import { GymOsAnalyticsRange, GymOsAnalyticsRangeResolver } from './gym-os-analytics-range';
+describe('GymOsAnalyticsRangeResolver',()=>{const service=new GymOsAnalyticsRangeResolver();
+ it.each(['Asia/Kolkata','America/New_York','Europe/London'])('resolves TODAY at local midnight in %s',(timezone)=>{const value=service.resolve(timezone,{range:GymOsAnalyticsRange.TODAY},DateTime.fromISO('2026-09-27T12:30:00Z') as DateTime<true>);expect(DateTime.fromJSDate(value.from).setZone(timezone).hour).toBe(0);expect(value.toExclusive>value.from).toBe(true);});
+ it('resolves the full prior month across a year boundary',()=>{const value=service.resolve('Asia/Kolkata',{range:GymOsAnalyticsRange.LAST_MONTH},DateTime.fromISO('2026-01-10T12:00:00Z') as DateTime<true>);expect(value.fromLocal.slice(0,10)).toBe('2025-12-01');expect(value.toLocal.slice(0,10)).toBe('2026-01-01');});
+ it('uses calendar boundaries through spring-forward and fall-back DST',()=>{const spring=service.resolve('America/New_York',{range:GymOsAnalyticsRange.CUSTOM,from:'2026-03-08',to:'2026-03-08'}),fall=service.resolve('America/New_York',{range:GymOsAnalyticsRange.CUSTOM,from:'2026-11-01',to:'2026-11-01'});expect((spring.toExclusive.getTime()-spring.from.getTime())/3600000).toBe(23);expect((fall.toExclusive.getTime()-fall.from.getTime())/3600000).toBe(25);});
+ it('rejects missing, reversed, and overlong custom periods',()=>{expect(()=>service.resolve('UTC',{range:GymOsAnalyticsRange.CUSTOM})).toThrow();expect(()=>service.resolve('UTC',{range:GymOsAnalyticsRange.CUSTOM,from:'2026-02-02',to:'2026-02-01'})).toThrow();expect(()=>service.resolve('UTC',{range:GymOsAnalyticsRange.CUSTOM,from:'2025-01-01',to:'2026-12-31'})).toThrow();});
+});

@@ -21,6 +21,7 @@ export default function RootLayout({
             "ADMIN",
             "SUPER_ADMIN",
           ]}
+          allowAuthenticatedWithoutRole
         >
           {children}
         </AppProviders>

@@ -51,6 +51,28 @@ describe("ApiClient", () => {
     });
   });
 
+  it("surfaces backend validation details instead of a generic message", async () => {
+    const client = new ApiClient("https://api.test", {
+      tokenStore: store(),
+      fetcher: vi.fn(() =>
+        Promise.resolve(
+          response(400, {
+            error: {
+              code: "VALIDATION_FAILED",
+              message: "Request validation failed",
+              details: ["phone must be a valid phone number"],
+            },
+          }),
+        ),
+      ),
+    });
+
+    await expect(client.request("/partner/branches")).rejects.toMatchObject({
+      message: "phone must be a valid phone number",
+      details: ["phone must be a valid phone number"],
+    });
+  });
+
   it("uses a single refresh for simultaneous unauthorized requests", async () => {
     const tokenStore = store();
     tokenStore.token = "refresh-1";
@@ -100,6 +122,30 @@ describe("ApiClient", () => {
     expect(onAuthFailure).toHaveBeenCalledOnce();
   });
 
+  it("abandons a stalled session restore instead of loading forever", async () => {
+    const tokenStore = store();
+    tokenStore.token = "stale-refresh";
+    const onAuthFailure = vi.fn();
+    const fetcher = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new DOMException("Aborted", "AbortError")),
+          );
+        }),
+    );
+    const client = new ApiClient("https://api.test", {
+      tokenStore,
+      onAuthFailure,
+      fetcher,
+      requestTimeoutMs: 1,
+    });
+
+    await expect(client.restore()).resolves.toBe(false);
+    expect(tokenStore.token).toBeNull();
+    expect(onAuthFailure).toHaveBeenCalledOnce();
+  });
+
   it("maps typed Phase 4 methods to role-specific endpoints", async () => {
     const fetcher = vi.fn((_input: RequestInfo | URL) =>
       Promise.resolve(response(200, [])),
@@ -115,6 +161,48 @@ describe("ApiClient", () => {
       "https://api.test/partner/gyms/gym-1/plans",
       "https://api.test/admin/bookings?status=EXPIRED",
     ]);
+  });
+
+  it("normalizes an empty first-time slot configuration response to null", async () => {
+    const fetcher = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 200 })),
+    );
+    const client = new ApiClient("https://api.test", {
+      tokenStore: store(),
+      fetcher,
+    });
+
+    await expect(
+      createGymRideApi(client).slots.config("branch-1"),
+    ).resolves.toBeNull();
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.test/partner/branches/branch-1/slot-config",
+      expect.any(Object),
+    );
+  });
+
+  it("saves and reloads a typed slot configuration", async () => {
+    const config = {
+      slotDurationMinutes: 45,
+      defaultCapacity: 16,
+      bookingWindowDays: 21,
+      minimumAdvanceMinutes: 30,
+      isActive: true,
+    };
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(response(200, config))
+      .mockResolvedValueOnce(response(200, config));
+    const domain = createGymRideApi(
+      new ApiClient("https://api.test", { tokenStore: store(), fetcher }),
+    );
+
+    await expect(domain.slots.saveConfig("branch-1", config)).resolves.toEqual(
+      config,
+    );
+    await expect(domain.slots.config("branch-1")).resolves.toEqual(config);
+    expect(fetcher.mock.calls[0][1]?.method).toBe("PUT");
+    expect(fetcher.mock.calls[0][1]?.body).toBe(JSON.stringify(config));
   });
   it("maps Phase 7 customer and branch-authorized verification endpoints", async () => {
     const fetcher = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>

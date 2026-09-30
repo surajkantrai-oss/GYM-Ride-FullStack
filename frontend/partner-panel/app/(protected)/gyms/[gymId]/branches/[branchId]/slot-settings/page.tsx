@@ -15,6 +15,7 @@ import {
   pushToast,
 } from "@gymride/web-ui";
 import { domainApi } from "@/lib/api";
+import { FIRST_SLOT_CONFIG_DEFAULTS } from "./slot-defaults";
 const today = () => new Date().toISOString().slice(0, 10);
 export default function SlotSettingsPage() {
   const { gymId, branchId } = useParams<{ gymId: string; branchId: string }>();
@@ -26,13 +27,7 @@ export default function SlotSettingsPage() {
   });
   const form = useForm<z.input<typeof slotConfigSchema>>({
     resolver: zodResolver(slotConfigSchema),
-    defaultValues: {
-      slotDurationMinutes: 60,
-      defaultCapacity: 20,
-      bookingWindowDays: 30,
-      minimumAdvanceMinutes: 60,
-      isActive: true,
-    },
+    defaultValues: FIRST_SLOT_CONFIG_DEFAULTS,
   });
   useEffect(() => {
     if (config.data) form.reset(config.data);

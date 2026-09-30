@@ -6,11 +6,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
-import { Field, pushToast } from "@gymride/web-ui";
+import { Field, pushToast, useAuth } from "@gymride/web-ui";
 import { api, json } from "@/lib/api";
-export function GymForm({ gym }: { gym?: GymSummary }) {
+export function GymForm({ gym, onboarding = false }: { gym?: GymSummary; onboarding?: boolean }) {
   const router = useRouter();
   const cache = useQueryClient();
+  const { reloadProfile } = useAuth();
   const form = useForm<z.infer<typeof gymSchema>>({
     resolver: zodResolver(gymSchema),
     defaultValues: {
@@ -25,9 +26,15 @@ export function GymForm({ gym }: { gym?: GymSummary }) {
         { method: gym ? "PATCH" : "POST", body: json(values) },
       ),
     onSuccess: async (saved) => {
+      if (onboarding) {
+        await api.restore();
+        await reloadProfile();
+      }
       await cache.invalidateQueries({ queryKey: ["partner-gyms"] });
+      await cache.invalidateQueries({ queryKey: ["partner-access-relationship"] });
       pushToast(gym ? "Gym saved" : "Gym created");
       router.push(`/gyms/${saved.id}`);
+      router.refresh();
     },
     onError: (error) =>
       pushToast(
@@ -56,12 +63,12 @@ export function GymForm({ gym }: { gym?: GymSummary }) {
         <button disabled={save.isPending}>
           {save.isPending ? "Saving…" : gym ? "Save changes" : "Create gym"}
         </button>
-        <a
+        {!onboarding && <a
           className="button button-secondary"
           href={gym ? `/gyms/${gym.id}` : "/gyms"}
         >
           Cancel
-        </a>
+        </a>}
       </div>
     </form>
   );

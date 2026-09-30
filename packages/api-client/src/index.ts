@@ -52,9 +52,11 @@ export function createGymRideApi(client: ApiClient) {
     },
     slots: {
       config: (branchId: string) =>
-        client.request<SlotConfig | null>(
-          `/partner/branches/${branchId}/slot-config`,
-        ),
+        client
+          .request<SlotConfig | null | undefined>(
+            `/partner/branches/${branchId}/slot-config`,
+          )
+          .then((value) => value ?? null),
       saveConfig: (branchId: string, input: SlotConfig) =>
         client.request<SlotConfig>(
           `/partner/branches/${branchId}/slot-config`,
@@ -142,18 +144,21 @@ interface ClientOptions {
   tokenStore: TokenStore;
   onAuthFailure?: () => void;
   fetcher?: typeof fetch;
+  requestTimeoutMs?: number;
 }
 
 export class ApiClient {
   private accessToken: string | null = null;
   private refreshPromise: Promise<string> | null = null;
   private readonly fetcher: typeof fetch;
+  private readonly requestTimeoutMs: number;
 
   constructor(
     private readonly baseUrl: string,
     private readonly options: ClientOptions,
   ) {
     this.fetcher = options.fetcher ?? globalThis.fetch.bind(globalThis);
+    this.requestTimeoutMs = options.requestTimeoutMs ?? 10_000;
   }
 
   setTokens(tokens: Tokens) {
@@ -190,17 +195,40 @@ export class ApiClient {
     if (this.accessToken)
       headers.set("authorization", `Bearer ${this.accessToken}`);
 
-    const response = await this.fetcher(`${this.baseUrl}${path}`, {
-      ...init,
-      headers,
-    });
+    const controller = new AbortController();
+    let timedOut = false;
+    const abortFromCaller = () => controller.abort();
+    if (init.signal?.aborted) controller.abort();
+    else
+      init.signal?.addEventListener("abort", abortFromCaller, { once: true });
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, this.requestTimeoutMs);
+    let response: Response;
+    try {
+      response = await this.fetcher(`${this.baseUrl}${path}`, {
+        ...init,
+        headers,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (timedOut)
+        throw new ApiError("The server took too long to respond.", 0);
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+      init.signal?.removeEventListener("abort", abortFromCaller);
+    }
     if (response.status === 401 && retry && path !== "/auth/refresh") {
       await this.refreshAccessToken();
       return this.request<T>(path, init, false);
     }
     if (!response.ok) throw await this.toError(response);
     if (response.status === 204) return undefined as T;
-    return response.json() as Promise<T>;
+    const body = await response.text();
+    if (!body.trim()) return undefined as T;
+    return JSON.parse(body) as T;
   }
 
   private async refreshAccessToken() {
@@ -243,9 +271,18 @@ export class ApiClient {
       // A non-JSON upstream error is still normalized for consumers.
     }
     const nested = typeof body.error === "object" ? body.error : undefined;
+    const validationDetails = Array.isArray(nested?.details)
+      ? nested.details.filter(
+          (detail): detail is string => typeof detail === "string",
+        )
+      : [];
     const message = Array.isArray(body.message)
       ? body.message.join(", ")
       : body.message ||
+        (nested?.message === "Request validation failed" &&
+        validationDetails.length
+          ? validationDetails.join(", ")
+          : undefined) ||
         nested?.message ||
         (typeof body.error === "string" ? body.error : undefined) ||
         `Request failed (${response.status})`;

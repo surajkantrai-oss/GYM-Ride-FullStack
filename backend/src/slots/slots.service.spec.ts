@@ -2,6 +2,66 @@ import { BookingStatus, BranchStatus, GymStatus, SlotStatus } from '@prisma/clie
 import { SlotsService } from './slots.service';
 
 describe('SlotsService capacity', () => {
+  it('returns null without creating data for a first-time authorized branch', async () => {
+    const prisma = {
+      branchSlotConfig: { findUnique: jest.fn().mockResolvedValue(null) },
+    };
+    const access = { assertBranchManagement: jest.fn().mockResolvedValue(undefined) };
+    const service = new SlotsService(prisma as never, access as never);
+
+    await expect(service.getConfig({ id: 'owner' } as never, 'branch')).resolves.toBeNull();
+    expect(access.assertBranchManagement).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'owner' }),
+      'branch',
+    );
+    expect(prisma.branchSlotConfig.findUnique).toHaveBeenCalledWith({
+      where: { branchId: 'branch' },
+    });
+  });
+
+  it('persists the first slot configuration with the existing upsert contract', async () => {
+    const dto = {
+      slotDurationMinutes: 45,
+      defaultCapacity: 16,
+      bookingWindowDays: 21,
+      minimumAdvanceMinutes: 30,
+      isActive: false,
+    };
+    const prisma = {
+      branchSlotConfig: { upsert: jest.fn().mockResolvedValue({ branchId: 'branch', ...dto }) },
+      slotInstance: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      gymBranch: { findUnique: jest.fn().mockResolvedValue({ slotConfig: { isActive: false } }) },
+    };
+    const access = { assertBranchManagement: jest.fn().mockResolvedValue(undefined) };
+    const service = new SlotsService(prisma as never, access as never);
+
+    await expect(service.putConfig({ id: 'owner' } as never, 'branch', dto)).resolves.toEqual({
+      branchId: 'branch',
+      ...dto,
+    });
+    expect(prisma.branchSlotConfig.upsert).toHaveBeenCalledWith({
+      where: { branchId: 'branch' },
+      update: dto,
+      create: { branchId: 'branch', ...dto },
+    });
+  });
+
+  it('does not read or write slot settings when branch authorization fails', async () => {
+    const denied = new Error('Branch not found');
+    const prisma = {
+      branchSlotConfig: { findUnique: jest.fn(), upsert: jest.fn() },
+    };
+    const access = { assertBranchManagement: jest.fn().mockRejectedValue(denied) };
+    const service = new SlotsService(prisma as never, access as never);
+
+    await expect(service.getConfig({ id: 'other-owner' } as never, 'foreign')).rejects.toBe(denied);
+    await expect(
+      service.putConfig({ id: 'other-owner' } as never, 'foreign', {} as never),
+    ).rejects.toBe(denied);
+    expect(prisma.branchSlotConfig.findUnique).not.toHaveBeenCalled();
+    expect(prisma.branchSlotConfig.upsert).not.toHaveBeenCalled();
+  });
+
   it('subtracts confirmed and unexpired reservations in one aggregated read', async () => {
     const branch = {
       status: BranchStatus.ACTIVE,

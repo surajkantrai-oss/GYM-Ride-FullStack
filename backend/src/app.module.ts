@@ -27,6 +27,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { FlexModule } from './flex/flex.module';
 import { RecommendationModule } from './recommendations/recommendation.module';
+import { GymOsModule } from './gym-os/gym-os.module';
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { RecommendationModule } from './recommendations/recommendation.module';
     NotificationsModule,
     FlexModule,
     RecommendationModule,
+    GymOsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

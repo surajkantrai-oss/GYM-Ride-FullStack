@@ -22,11 +22,11 @@ import { PartnerGymsService } from './partner-gyms.service';
 @ApiTags('Partner Gyms')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.ADMIN, RoleName.SUPER_ADMIN)
+@Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.GYM_STAFF, RoleName.ADMIN, RoleName.SUPER_ADMIN)
 @Controller('partner/gyms')
 export class PartnerGymsController {
   constructor(private readonly gyms: PartnerGymsService) {}
-  @Post() @Roles(RoleName.GYM_OWNER, RoleName.ADMIN, RoleName.SUPER_ADMIN) create(
+  @Post() @Roles(RoleName.CUSTOMER, RoleName.GYM_OWNER, RoleName.ADMIN, RoleName.SUPER_ADMIN) create(
     @CurrentUser() user: AuthUser,
     @Body() dto: CreateGymDto,
   ): Promise<unknown> {

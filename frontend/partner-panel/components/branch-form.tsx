@@ -26,8 +26,8 @@ export function BranchForm({
       state: branch?.state ?? "",
       postalCode: branch?.postalCode ?? "",
       country: branch?.country ?? "IN",
-      latitude: branch?.latitude ?? "",
-      longitude: branch?.longitude ?? "",
+      latitude: String(branch?.latitude ?? ""),
+      longitude: String(branch?.longitude ?? ""),
       phone: branch?.phone ?? "",
       email: branch?.email ?? "",
       timezone: branch?.timezone ?? "Asia/Kolkata",
@@ -70,7 +70,11 @@ export function BranchForm({
         <input {...form.register("name")} />
       </Field>
       <Field label="Phone" error={form.formState.errors.phone?.message}>
-        <input {...form.register("phone")} />
+        <input
+          inputMode="tel"
+          placeholder="+919876543210"
+          {...form.register("phone")}
+        />
       </Field>
       <div className="span-2">
         <Field

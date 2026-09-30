@@ -78,6 +78,189 @@ enum AuditAction {
   FLEX_PARTICIPATION_CHANGED
   FLEX_SUBSCRIPTION_ADJUSTED
   FLEX_REIMBURSEMENT_CHANGED
+  GYMOS_PLAN_CHANGED
+  GYMOS_SUBSCRIPTION_CREATED
+  GYMOS_SUBSCRIPTION_ACTIVATED
+  GYMOS_SUBSCRIPTION_CANCELLED
+  GYMOS_SUBSCRIPTION_EXPIRED
+  GYMOS_SUBSCRIPTION_SUSPENDED
+  GYMOS_MEMBER_CREATED
+  GYMOS_MEMBER_UPDATED
+  GYMOS_MEMBER_DEACTIVATED
+  GYMOS_MEMBER_REACTIVATED
+  GYMOS_MEMBER_ARCHIVED
+  GYMOS_MEMBER_BULK_IMPORTED
+  GYMOS_MEMBERSHIP_PLAN_CHANGED
+  GYMOS_MEMBERSHIP_CREATED
+  GYMOS_MEMBERSHIP_FROZEN
+  GYMOS_MEMBERSHIP_RESUMED
+  GYMOS_MEMBERSHIP_CANCELLED
+  GYMOS_MEMBERSHIP_RENEWED
+  GYMOS_MEMBERSHIP_EXPIRED
+  GYMOS_ATTENDANCE_CHECKED_IN
+  GYMOS_ATTENDANCE_CHECKED_OUT
+  GYMOS_MEMBER_CHARGE_CREATED
+  GYMOS_MEMBER_PAYMENT_RECORDED
+  GYMOS_MEMBER_PAYMENT_REVERSED
+  GYMOS_REMINDER_RULE_CHANGED
+  GYMOS_REMINDER_MANUAL_REQUESTED
+  GYMOS_COMMUNICATION_PREFERENCE_CHANGED
+  GYMOS_REMINDER_CAMPAIGN_CREATED
+  GYMOS_REMINDER_CAMPAIGN_CANCELLED
+}
+enum GymOsReminderType {
+  MEMBERSHIP_EXPIRING
+  MEMBERSHIP_EXPIRED
+  PAYMENT_DUE
+  PAYMENT_OVERDUE
+  INACTIVITY
+}
+enum GymOsReminderChannel {
+  WHATSAPP
+  SMS
+  EMAIL
+}
+enum GymOsReminderDeliveryStatus {
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+  SKIPPED
+  CANCELLED
+}
+enum GymOsReminderCampaignStatus {
+  DRAFT
+  SCHEDULED
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+enum GymOsReminderCampaignSegment {
+  EXPIRING_IN_7_DAYS
+  OVERDUE
+  NO_VISIT_14_DAYS
+  NEW_MEMBER_NO_VISIT_7_DAYS
+}
+
+enum GymOsMemberChargeType {
+  MEMBERSHIP
+  RENEWAL
+  ADJUSTMENT
+}
+
+enum GymOsMemberChargeStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum GymOsMemberPaymentMethod {
+  CASH
+  UPI
+  CARD
+  BANK_TRANSFER
+  CHEQUE
+  OTHER
+}
+
+enum GymOsMemberPaymentStatus {
+  RECORDED
+  REVERSED
+}
+
+enum GymOsAttendanceStatus {
+  CHECKED_IN
+  CHECKED_OUT
+}
+
+enum GymOsAttendanceMethod {
+  MANUAL
+  QR
+}
+
+enum GymOsAttendanceQrStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum GymOsPlanStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum GymOsBillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum GymOsFeature {
+  MEMBERS
+  MEMBERSHIP_MANAGEMENT
+  ATTENDANCE
+  RENEWALS
+  DUES
+  REPORTS
+  STAFF
+  REMINDERS
+  CRM
+  MULTI_BRANCH
+}
+
+enum GymOsSubscriptionStatus {
+  TRIALING
+  PENDING_PAYMENT
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+  SUSPENDED
+}
+
+enum GymOsPaymentStatus {
+  CREATED
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum GymMemberStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum GymOsMembershipPlanStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+enum GymOsMembershipDurationType {
+  DAYS
+  WEEKS
+  MONTHS
+}
+enum GymOsMembershipStatus {
+  SCHEDULED
+  ACTIVE
+  FROZEN
+  EXPIRED
+  CANCELLED
+}
+enum GymOsMembershipEventType {
+  CREATED
+  ACTIVATED
+  FROZEN
+  RESUMED
+  RENEWED
+  CANCELLED
+  EXPIRED
+  UPDATED
 }
 
 enum PlanType {
@@ -172,6 +355,13 @@ enum NotificationType {
   FLEX_USAGE_RECORDED
   FLEX_USAGE_LIMIT_REACHED
   FLEX_SUBSCRIPTION_EXPIRED
+  GYMOS_TRIAL_STARTED
+  GYMOS_TRIAL_EXPIRING
+  GYMOS_SUBSCRIPTION_ACTIVATED
+  GYMOS_SUBSCRIPTION_EXPIRING
+  GYMOS_SUBSCRIPTION_EXPIRED
+  GYMOS_PAYMENT_FAILED
+  GYMOS_SUBSCRIPTION_CANCELLED
 }
 
 enum NotificationCategory {
@@ -183,6 +373,7 @@ enum NotificationCategory {
   SETTLEMENT
   MARKETING
   FLEX
+  GYMOS
 }
 
 enum FlexPlanStatus {
@@ -270,6 +461,15 @@ model User {
   flexSubscriptions       FlexSubscription[]
   flexUsages              FlexUsage[]
   gymPreference           CustomerGymPreference?
+  linkedGymMembers        GymMember[]              @relation("GymMemberUser")
+  createdGymMembers       GymMember[]              @relation("GymMemberCreator")
+  updatedGymMembers       GymMember[]              @relation("GymMemberUpdater")
+  createdMembershipPlans  GymOsMembershipPlan[]    @relation("MembershipPlanCreator")
+  updatedMembershipPlans  GymOsMembershipPlan[]    @relation("MembershipPlanUpdater")
+  createdMemberships      GymOsMembership[]        @relation("MembershipCreator")
+  updatedMemberships      GymOsMembership[]        @relation("MembershipUpdater")
+  membershipEvents        GymOsMembershipEvent[]   @relation("MembershipEventActor")
+  recordedGymOsAttendances GymOsAttendance[]        @relation("AttendanceRecorder")
 
   @@map("users")
 }
@@ -334,10 +534,485 @@ model Gym {
   reviews            Review[]
   flexParticipations GymFlexParticipation[]
   flexUsages         FlexUsage[]
+  gymOsSubscriptions GymOsSubscription[]
+  gymOsMembers       GymMember[]
+  gymOsMembershipPlans GymOsMembershipPlan[]
+  gymOsMemberships GymOsMembership[]
+  gymOsMembershipEvents GymOsMembershipEvent[]
+  gymOsAttendances GymOsAttendance[]
+  gymOsAttendanceQrTokens GymOsAttendanceQrToken[]
+  gymOsMemberCharges GymOsMemberCharge[]
+  gymOsMemberPayments GymOsMemberPayment[]
+  gymOsMemberReceipts GymOsMemberReceipt[]
+  gymOsReceiptCounters GymOsReceiptCounter[]
+  gymOsReminderRules GymOsReminderRule[]
+  gymOsReminderDeliveries GymOsReminderDelivery[]
+  gymOsCommunicationPreferences GymOsMemberCommunicationPreference[]
+  gymOsReminderCampaigns GymOsReminderCampaign[]
 
   @@index([ownerId])
   @@index([status])
   @@map("gyms")
+}
+
+model GymMember {
+  id                    String          @id @default(uuid()) @db.Uuid
+  gymId                 String          @map("gym_id") @db.Uuid
+  primaryBranchId       String?         @map("primary_branch_id") @db.Uuid
+  userId                String?         @map("user_id") @db.Uuid
+  memberCode            String          @map("member_code") @db.VarChar(32)
+  firstName             String          @map("first_name") @db.VarChar(100)
+  lastName              String?         @map("last_name") @db.VarChar(100)
+  phone                 String          @db.VarChar(32)
+  email                 String?         @db.VarChar(320)
+  dateOfBirth           DateTime?       @map("date_of_birth") @db.Date
+  joinedAt              DateTime?       @map("joined_at") @db.Date
+  notes                 String?         @db.VarChar(2000)
+  emergencyContactName  String?         @map("emergency_contact_name") @db.VarChar(160)
+  emergencyContactPhone String?         @map("emergency_contact_phone") @db.VarChar(32)
+  addressLine1          String?         @map("address_line_1") @db.VarChar(255)
+  city                  String?         @db.VarChar(120)
+  state                 String?         @db.VarChar(120)
+  postalCode            String?         @map("postal_code") @db.VarChar(20)
+  country               String?         @db.Char(2)
+  status                GymMemberStatus @default(ACTIVE)
+  archivedAt            DateTime?       @map("archived_at") @db.Timestamptz(6)
+  createdByUserId       String          @map("created_by_user_id") @db.Uuid
+  updatedByUserId       String?         @map("updated_by_user_id") @db.Uuid
+  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gym                   Gym             @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  primaryBranch         GymBranch?      @relation(fields: [primaryBranchId], references: [id], onDelete: SetNull)
+  user                  User?           @relation("GymMemberUser", fields: [userId], references: [id], onDelete: SetNull)
+  createdBy             User            @relation("GymMemberCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedBy             User?           @relation("GymMemberUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  memberships           GymOsMembership[]
+  membershipEvents      GymOsMembershipEvent[]
+  attendances            GymOsAttendance[]
+  charges                GymOsMemberCharge[]
+  payments               GymOsMemberPayment[]
+  reminderDeliveries GymOsReminderDelivery[]
+  communicationPreference GymOsMemberCommunicationPreference?
+
+  @@unique([gymId, memberCode])
+  @@unique([gymId, phone])
+  @@index([gymId, status])
+  @@index([gymId, primaryBranchId])
+  @@index([gymId, firstName, lastName])
+  @@map("gym_members")
+}
+
+model GymOsMembershipPlan {
+  id String @id @default(uuid()) @db.Uuid
+  gymId String @map("gym_id") @db.Uuid
+  name String @db.VarChar(120)
+  code String @db.VarChar(50)
+  description String? @db.VarChar(1000)
+  status GymOsMembershipPlanStatus @default(DRAFT)
+  durationType GymOsMembershipDurationType @map("duration_type")
+  durationValue Int @map("duration_value")
+  priceMinor Int @map("price_minor")
+  currency String @default("INR") @db.Char(3)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdByUserId String @map("created_by_user_id") @db.Uuid
+  updatedByUserId String? @map("updated_by_user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gym Gym @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  createdBy User @relation("MembershipPlanCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedBy User? @relation("MembershipPlanUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  branches GymOsMembershipPlanBranch[]
+  memberships GymOsMembership[]
+  @@unique([gymId, code])
+  @@index([gymId, status])
+  @@map("gym_os_membership_plans")
+}
+
+model GymOsMembershipPlanBranch {
+  planId String @map("plan_id") @db.Uuid
+  branchId String @map("branch_id") @db.Uuid
+  plan GymOsMembershipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  branch GymBranch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  @@id([planId, branchId])
+  @@index([branchId])
+  @@map("gym_os_membership_plan_branches")
+}
+
+model GymOsMembership {
+  id String @id @default(uuid()) @db.Uuid
+  gymId String @map("gym_id") @db.Uuid
+  memberId String @map("member_id") @db.Uuid
+  membershipPlanId String @map("membership_plan_id") @db.Uuid
+  status GymOsMembershipStatus
+  startDate DateTime @map("start_date") @db.Date
+  endDate DateTime @map("end_date") @db.Date
+  planNameSnapshot String @map("plan_name_snapshot") @db.VarChar(120)
+  planCodeSnapshot String @map("plan_code_snapshot") @db.VarChar(50)
+  durationTypeSnapshot GymOsMembershipDurationType @map("duration_type_snapshot")
+  durationValueSnapshot Int @map("duration_value_snapshot")
+  priceMinorSnapshot Int @map("price_minor_snapshot")
+  currencySnapshot String @map("currency_snapshot") @db.Char(3)
+  branchIdsSnapshot String[] @map("branch_ids_snapshot") @db.Uuid
+  freezeStartedAt DateTime? @map("freeze_started_at") @db.Timestamptz(6)
+  totalFrozenDays Int @default(0) @map("total_frozen_days")
+  cancelledAt DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancellationReason String? @map("cancellation_reason") @db.VarChar(500)
+  expiredAt DateTime? @map("expired_at") @db.Timestamptz(6)
+  renewedFromMembershipId String? @unique @map("renewed_from_membership_id") @db.Uuid
+  createdByUserId String @map("created_by_user_id") @db.Uuid
+  updatedByUserId String? @map("updated_by_user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gym Gym @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  member GymMember @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  membershipPlan GymOsMembershipPlan @relation(fields: [membershipPlanId], references: [id], onDelete: Restrict)
+  renewedFrom GymOsMembership? @relation("MembershipRenewal", fields: [renewedFromMembershipId], references: [id], onDelete: Restrict)
+  renewedTo GymOsMembership? @relation("MembershipRenewal")
+  createdBy User @relation("MembershipCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedBy User? @relation("MembershipUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  events GymOsMembershipEvent[]
+  attendances GymOsAttendance[]
+  charge GymOsMemberCharge?
+  @@index([gymId, status])
+  @@index([memberId])
+  @@index([endDate])
+  @@index([startDate])
+  @@index([membershipPlanId])
+  @@map("gym_os_memberships")
+}
+
+model GymOsMemberCharge {
+  id String @id @default(uuid()) @db.Uuid
+  gymId String @map("gym_id") @db.Uuid
+  memberId String @map("member_id") @db.Uuid
+  membershipId String @unique @map("membership_id") @db.Uuid
+  type GymOsMemberChargeType
+  description String @db.VarChar(255)
+  amountMinor Int @map("amount_minor")
+  currency String @db.Char(3)
+  dueDate DateTime @map("due_date") @db.Date
+  status GymOsMemberChargeStatus @default(UNPAID)
+  createdByUserId String @map("created_by_user_id") @db.Uuid
+  voidedAt DateTime? @map("voided_at") @db.Timestamptz(6)
+  voidReason String? @map("void_reason") @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gym Gym @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  member GymMember @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  membership GymOsMembership @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  allocations GymOsPaymentAllocation[]
+  @@index([gymId, dueDate])
+  @@index([gymId, memberId])
+  @@index([gymId, status])
+  @@map("gym_os_member_charges")
+}
+
+model GymOsMemberPayment {
+  id String @id @default(uuid()) @db.Uuid
+  gymId String @map("gym_id") @db.Uuid
+  memberId String @map("member_id") @db.Uuid
+  amountMinor Int @map("amount_minor")
+  currency String @db.Char(3)
+  method GymOsMemberPaymentMethod
+  status GymOsMemberPaymentStatus @default(RECORDED)
+  source String @default("MANUAL") @db.VarChar(20)
+  paidAt DateTime @map("paid_at") @db.Timestamptz(6)
+  reference String? @db.VarChar(160)
+  notes String? @db.VarChar(1000)
+  recordedByUserId String @map("recorded_by_user_id") @db.Uuid
+  idempotencyKey String @map("idempotency_key") @db.VarChar(160)
+  reversedAt DateTime? @map("reversed_at") @db.Timestamptz(6)
+  reversedByUserId String? @map("reversed_by_user_id") @db.Uuid
+  reversalReason String? @map("reversal_reason") @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gym Gym @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  member GymMember @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  allocations GymOsPaymentAllocation[]
+  receipt GymOsMemberReceipt?
+  @@unique([gymId, idempotencyKey])
+  @@index([gymId, paidAt])
+  @@index([gymId, memberId])
+  @@index([gymId, method])
+  @@index([gymId, status])
+  @@map("gym_os_member_payments")
+}
+
+model GymOsPaymentAllocation {
+  id String @id @default(uuid()) @db.Uuid
+  paymentId String @map("payment_id") @db.Uuid
+  chargeId String @map("charge_id") @db.Uuid
+  amountMinor Int @map("amount_minor")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  payment GymOsMemberPayment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  charge GymOsMemberCharge @relation(fields: [chargeId], references: [id], onDelete: Restrict)
+  @@unique([paymentId, chargeId])
+  @@index([chargeId])
+  @@map("gym_os_payment_allocations")
+}
+
+model GymOsMemberReceipt {
+  id String @id @default(uuid()) @db.Uuid
+  gymId String @map("gym_id") @db.Uuid
+  paymentId String @unique @map("payment_id") @db.Uuid
+  receiptNumber String @map("receipt_number") @db.VarChar(40)
+  generatedAt DateTime @default(now()) @map("generated_at") @db.Timestamptz(6)
+  gym Gym @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  payment GymOsMemberPayment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  @@unique([gymId, receiptNumber])
+  @@index([gymId, generatedAt])
+  @@map("gym_os_member_receipts")
+}
+
+model GymOsReceiptCounter {
+  id String @id @default(uuid()) @db.Uuid
+  gymId String @map("gym_id") @db.Uuid
+  year Int
+  value Int @default(0)
+  gym Gym @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  @@unique([gymId, year])
+  @@map("gym_os_receipt_counters")
+}
+model GymOsReminderRule {
+ id String @id @default(uuid()) @db.Uuid
+ gymId String @map("gym_id") @db.Uuid
+ type GymOsReminderType
+ channel GymOsReminderChannel
+ offsetDays Int @map("offset_days")
+ enabled Boolean @default(false)
+ sendTime String @default("10:00") @map("send_time") @db.VarChar(5)
+ quietStart String @default("21:00") @map("quiet_start") @db.VarChar(5)
+ quietEnd String @default("08:00") @map("quiet_end") @db.VarChar(5)
+ lastRunAt DateTime? @map("last_run_at") @db.Timestamptz(6)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+ updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+ gym Gym @relation(fields:[gymId],references:[id],onDelete:Restrict)
+ deliveries GymOsReminderDelivery[]
+ @@unique([gymId,type,channel,offsetDays])
+ @@index([gymId,type])
+ @@map("gym_os_reminder_rules")
+}
+model GymOsMemberCommunicationPreference {
+ id String @id @default(uuid()) @db.Uuid
+ gymId String @map("gym_id") @db.Uuid
+ memberId String @unique @map("member_id") @db.Uuid
+ allowTransactional Boolean @default(true) @map("allow_transactional")
+ allowMarketing Boolean @default(false) @map("allow_marketing")
+ allowWhatsApp Boolean @default(true) @map("allow_whatsapp")
+ allowSms Boolean @default(false) @map("allow_sms")
+ allowEmail Boolean @default(false) @map("allow_email")
+ updatedByUserId String? @map("updated_by_user_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+ updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+ gym Gym @relation(fields:[gymId],references:[id],onDelete:Restrict)
+ member GymMember @relation(fields:[memberId],references:[id],onDelete:Restrict)
+ @@index([gymId])
+ @@map("gym_os_member_communication_preferences")
+}
+model GymOsReminderDelivery {
+ id String @id @default(uuid()) @db.Uuid
+ gymId String @map("gym_id") @db.Uuid
+ memberId String @map("member_id") @db.Uuid
+ ruleId String? @map("rule_id") @db.Uuid
+ campaignId String? @map("campaign_id") @db.Uuid
+ type GymOsReminderType
+ channel GymOsReminderChannel
+ subjectType String @map("subject_type") @db.VarChar(40)
+ subjectId String @map("subject_id") @db.Uuid
+ scheduledFor DateTime @map("scheduled_for") @db.Timestamptz(6)
+ attemptedAt DateTime? @map("attempted_at") @db.Timestamptz(6)
+ sentAt DateTime? @map("sent_at") @db.Timestamptz(6)
+ status GymOsReminderDeliveryStatus @default(SCHEDULED)
+ provider String @default("development") @db.VarChar(40)
+ providerMessageId String? @map("provider_message_id") @db.VarChar(160)
+ attemptCount Int @default(0) @map("attempt_count")
+ lastErrorCode String? @map("last_error_code") @db.VarChar(80)
+ dedupeKey String @unique @map("dedupe_key") @db.VarChar(255)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+ updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+ gym Gym @relation(fields:[gymId],references:[id],onDelete:Restrict)
+ member GymMember @relation(fields:[memberId],references:[id],onDelete:Restrict)
+ rule GymOsReminderRule? @relation(fields:[ruleId],references:[id],onDelete:SetNull)
+ campaign GymOsReminderCampaign? @relation(fields:[campaignId],references:[id],onDelete:SetNull)
+ @@index([gymId,scheduledFor])
+ @@index([gymId,status])
+ @@index([memberId,createdAt])
+ @@index([campaignId])
+ @@map("gym_os_reminder_deliveries")
+}
+model GymOsReminderCampaign {
+ id String @id @default(uuid()) @db.Uuid
+ gymId String @map("gym_id") @db.Uuid
+ name String @db.VarChar(160)
+ type GymOsReminderType
+ channel GymOsReminderChannel
+ segment GymOsReminderCampaignSegment
+ scheduledFor DateTime @map("scheduled_for") @db.Timestamptz(6)
+ status GymOsReminderCampaignStatus @default(SCHEDULED)
+ createdByUserId String @map("created_by_user_id") @db.Uuid
+ startedAt DateTime? @map("started_at") @db.Timestamptz(6)
+ completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+ cancelledAt DateTime? @map("cancelled_at") @db.Timestamptz(6)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+ updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+ gym Gym @relation(fields:[gymId],references:[id],onDelete:Restrict)
+ deliveries GymOsReminderDelivery[]
+ @@index([gymId,status,scheduledFor])
+ @@map("gym_os_reminder_campaigns")
+}
+
+model GymOsMembershipEvent {
+  id String @id @default(uuid()) @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  gymId String @map("gym_id") @db.Uuid
+  memberId String @map("member_id") @db.Uuid
+  type GymOsMembershipEventType
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  performedByUserId String? @map("performed_by_user_id") @db.Uuid
+  reason String? @db.VarChar(500)
+  metadata Json?
+  membership GymOsMembership @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  gym Gym @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  member GymMember @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  performedBy User? @relation("MembershipEventActor", fields: [performedByUserId], references: [id], onDelete: SetNull)
+  @@index([membershipId, occurredAt])
+  @@index([gymId, occurredAt])
+  @@map("gym_os_membership_events")
+}
+
+model GymOsAttendance {
+  id String @id @default(uuid()) @db.Uuid
+  gymId String @map("gym_id") @db.Uuid
+  branchId String @map("branch_id") @db.Uuid
+  memberId String @map("member_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  status GymOsAttendanceStatus @default(CHECKED_IN)
+  checkInAt DateTime @default(now()) @map("check_in_at") @db.Timestamptz(6)
+  checkOutAt DateTime? @map("check_out_at") @db.Timestamptz(6)
+  checkInMethod GymOsAttendanceMethod @map("check_in_method")
+  checkOutMethod GymOsAttendanceMethod? @map("check_out_method")
+  recordedByUserId String? @map("recorded_by_user_id") @db.Uuid
+  qrTokenId String? @map("qr_token_id") @db.Uuid
+  manualReason String? @map("manual_reason") @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gym Gym @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  branch GymBranch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  member GymMember @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  membership GymOsMembership @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  recordedBy User? @relation("AttendanceRecorder", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+  qrToken GymOsAttendanceQrToken? @relation(fields: [qrTokenId], references: [id], onDelete: SetNull)
+  @@index([gymId, checkInAt])
+  @@index([branchId, checkInAt])
+  @@index([memberId, checkInAt])
+  @@index([membershipId])
+  @@index([checkOutAt])
+  @@map("gym_os_attendances")
+}
+
+model GymOsAttendanceQrToken {
+  id String @id @default(uuid()) @db.Uuid
+  gymId String @map("gym_id") @db.Uuid
+  branchId String @map("branch_id") @db.Uuid
+  tokenHash String @unique @map("token_hash") @db.Char(64)
+  status GymOsAttendanceQrStatus @default(ACTIVE)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  gym Gym @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  branch GymBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  attendances GymOsAttendance[]
+  @@index([branchId, expiresAt])
+  @@index([expiresAt])
+  @@map("gym_os_attendance_qr_tokens")
+}
+
+model GymOsPlan {
+  id              String               @id @default(uuid()) @db.Uuid
+  code            String               @unique @db.VarChar(50)
+  name            String               @db.VarChar(100)
+  description     String               @db.Text
+  status          GymOsPlanStatus      @default(DRAFT)
+  billingInterval GymOsBillingInterval @map("billing_interval")
+  priceMinor      Int                  @map("price_minor")
+  currency        String               @default("INR") @db.Char(3)
+  trialDays       Int                  @default(0) @map("trial_days")
+  memberLimit     Int                  @map("member_limit")
+  branchLimit     Int                  @map("branch_limit")
+  displayOrder    Int                  @default(0) @map("display_order")
+  archivedAt      DateTime?            @map("archived_at") @db.Timestamptz(6)
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  features        GymOsPlanFeature[]
+  subscriptions   GymOsSubscription[]
+
+  @@index([status, displayOrder])
+  @@map("gym_os_plans")
+}
+
+model GymOsPlanFeature {
+  planId    String       @map("plan_id") @db.Uuid
+  feature   GymOsFeature
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  plan      GymOsPlan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@id([planId, feature])
+  @@map("gym_os_plan_features")
+}
+
+model GymOsSubscription {
+  id                     String                  @id @default(uuid()) @db.Uuid
+  gymId                  String                  @map("gym_id") @db.Uuid
+  planId                 String                  @map("plan_id") @db.Uuid
+  status                 GymOsSubscriptionStatus @default(PENDING_PAYMENT)
+  billingInterval        GymOsBillingInterval    @map("billing_interval")
+  currentPeriodStart     DateTime?               @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd       DateTime?               @map("current_period_end") @db.Timestamptz(6)
+  trialStart             DateTime?               @map("trial_start") @db.Timestamptz(6)
+  trialEnd               DateTime?               @map("trial_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd      Boolean                 @default(false) @map("cancel_at_period_end")
+  cancelledAt            DateTime?               @map("cancelled_at") @db.Timestamptz(6)
+  activatedAt            DateTime?               @map("activated_at") @db.Timestamptz(6)
+  expiredAt              DateTime?               @map("expired_at") @db.Timestamptz(6)
+  suspendedAt            DateTime?               @map("suspended_at") @db.Timestamptz(6)
+  suspensionReason       String?                 @map("suspension_reason") @db.VarChar(1000)
+  provider               String                  @db.VarChar(30)
+  providerSubscriptionId String?                 @unique @map("provider_subscription_id")
+  idempotencyKey         String                  @unique @map("idempotency_key") @db.VarChar(120)
+  planCodeSnapshot       String                  @map("plan_code_snapshot") @db.VarChar(50)
+  planNameSnapshot       String                  @map("plan_name_snapshot") @db.VarChar(100)
+  priceMinorSnapshot     Int                     @map("price_minor_snapshot")
+  currencySnapshot       String                  @map("currency_snapshot") @db.Char(3)
+  memberLimitSnapshot    Int                     @map("member_limit_snapshot")
+  branchLimitSnapshot    Int                     @map("branch_limit_snapshot")
+  trialDaysSnapshot      Int                     @map("trial_days_snapshot")
+  featuresSnapshot       GymOsFeature[]          @map("features_snapshot")
+  createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gym                    Gym                     @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  plan                   GymOsPlan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  payment                GymOsPayment?
+
+  @@index([gymId, status])
+  @@index([status, currentPeriodEnd])
+  @@map("gym_os_subscriptions")
+}
+
+model GymOsPayment {
+  id                String             @id @default(uuid()) @db.Uuid
+  subscriptionId    String             @unique @map("subscription_id") @db.Uuid
+  provider          String             @db.VarChar(30)
+  providerOrderId   String?            @unique @map("provider_order_id")
+  providerPaymentId String?            @unique @map("provider_payment_id")
+  amount            Int
+  currency          String             @db.Char(3)
+  status            GymOsPaymentStatus @default(CREATED)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  subscription      GymOsSubscription  @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@map("gym_os_payments")
 }
 
 model GymBranch {
@@ -371,6 +1046,10 @@ model GymBranch {
   reviews            Review[]
   flexParticipations GymFlexParticipation[]
   flexUsages         FlexUsage[]
+  gymOsMembers       GymMember[]
+  gymOsMembershipPlanBranches GymOsMembershipPlanBranch[]
+  gymOsAttendances GymOsAttendance[]
+  gymOsAttendanceQrTokens GymOsAttendanceQrToken[]
 
   @@unique([gymId, name])
   @@index([gymId])

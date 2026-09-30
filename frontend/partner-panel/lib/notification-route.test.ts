@@ -6,6 +6,7 @@ describe("partner notification navigation", () => {
   it("routes known review and settlement notices to fixed portal pages", () => {
     expect(partnerNotificationHref({ screen: "PartnerReviews", gymId: id })).toBe("/reviews");
     expect(partnerNotificationHref({ screen: "PartnerSettlement", settlementId: id })).toBe("/finance");
+    expect(partnerNotificationHref({ screen: "PartnerGymOs", gymId: id })).toBe(`/gym-os?gymId=${id}`);
   });
   it("never opens provider-supplied URLs", () => {
     expect(partnerNotificationHref({ screen: "https://evil.invalid", gymId: id })).toBeNull();

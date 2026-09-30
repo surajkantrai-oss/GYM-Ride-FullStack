@@ -19,9 +19,10 @@ for (const [command, args] of [
   ['createdb', ['--owner', url.username, 'gymride_finance_test']],
   ['psql', ['-d', 'gymride_finance_test', '-c', 'CREATE EXTENSION IF NOT EXISTS postgis']],
   ['pnpm', ['exec', 'prisma', 'migrate', 'deploy']],
+  ['pnpm', ['exec', 'prisma', 'db', 'seed']],
   [
     'pnpm',
-    ['exec', 'jest', '--runInBand', '--testRegex', '(finance|check-in|reviews-notifications|flex|recommendations).runtime-spec.ts$', '--testTimeout', '30000'],
+    ['exec', 'jest', '--runInBand', '--testRegex', '(finance|check-in|reviews-notifications|flex|recommendations|gym-os).runtime-spec.ts$', '--testTimeout', '30000'],
   ],
 ]) {
   const result = spawnSync(command, args, { env, stdio: 'inherit' });

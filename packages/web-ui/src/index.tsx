@@ -43,9 +43,23 @@ export function hasAllowedRole(
   return userRoles.some((role) => allowedRoles.includes(role));
 }
 
+export function consoleAccessStatus(
+  userRoles: RoleName[],
+  allowedRoles: RoleName[],
+  allowAuthenticatedWithoutRole = false,
+): "authenticated" | "onboarding" | "forbidden" {
+  if (hasAllowedRole(userRoles, allowedRoles)) return "authenticated";
+  return allowAuthenticatedWithoutRole ? "onboarding" : "forbidden";
+}
+
 interface AuthContextValue {
   user: UserProfile | null;
-  status: "loading" | "authenticated" | "unauthenticated" | "forbidden";
+  status:
+    | "loading"
+    | "authenticated"
+    | "onboarding"
+    | "unauthenticated"
+    | "forbidden";
   login(phone: string, otp: string): Promise<void>;
   logout(): Promise<void>;
   reloadProfile(): Promise<UserProfile>;
@@ -57,10 +71,12 @@ export function AppProviders({
   children,
   api,
   allowedRoles,
+  allowAuthenticatedWithoutRole = false,
 }: {
   children: ReactNode;
   api: ApiClient;
   allowedRoles: RoleName[];
+  allowAuthenticatedWithoutRole?: boolean;
 }) {
   const [queryClient] = useState(
     () =>
@@ -72,7 +88,11 @@ export function AppProviders({
   );
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider api={api} allowedRoles={allowedRoles}>
+      <AuthProvider
+        api={api}
+        allowedRoles={allowedRoles}
+        allowAuthenticatedWithoutRole={allowAuthenticatedWithoutRole}
+      >
         {children}
       </AuthProvider>
       <ToastProvider />
@@ -84,20 +104,26 @@ function AuthProvider({
   children,
   api,
   allowedRoles,
+  allowAuthenticatedWithoutRole,
 }: {
   children: ReactNode;
   api: ApiClient;
   allowedRoles: RoleName[];
+  allowAuthenticatedWithoutRole: boolean;
 }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [status, setStatus] = useState<AuthContextValue["status"]>("loading");
   const queryClient = useQueryClient();
 
   const accept = (profile: UserProfile) => {
-    const authorized = hasAllowedRole(profile.roles, allowedRoles);
-    setUser(authorized ? profile : null);
-    setStatus(authorized ? "authenticated" : "forbidden");
-    if (!authorized) api.clearSession();
+    const access = consoleAccessStatus(
+      profile.roles,
+      allowedRoles,
+      allowAuthenticatedWithoutRole,
+    );
+    setUser(access !== "forbidden" ? profile : null);
+    setStatus(access);
+    if (access === "forbidden") api.clearSession();
     return profile;
   };
 
@@ -137,7 +163,10 @@ function AuthProvider({
         });
         api.setTokens(result.tokens);
         accept(result.user);
-        if (!hasAllowedRole(result.user.roles, allowedRoles)) {
+        if (
+          !allowAuthenticatedWithoutRole &&
+          !hasAllowedRole(result.user.roles, allowedRoles)
+        ) {
           throw new ApiError(
             "This account does not have access to this console.",
             403,
@@ -158,7 +187,7 @@ function AuthProvider({
       },
       reloadProfile,
     }),
-    [allowedRoles, api, queryClient, status, user],
+    [allowAuthenticatedWithoutRole, allowedRoles, api, queryClient, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -189,7 +218,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
         detail="This account does not have the required role."
       />
     );
-  if (status !== "authenticated") return <PageState title="Redirecting…" />;
+  if (status !== "authenticated" && status !== "onboarding")
+    return <PageState title="Redirecting…" />;
   return children;
 }
 
@@ -354,6 +384,7 @@ const navIcons: Record<string, string> = {
   NT: "●",
   CI: "⌁",
   ME: "○",
+  OS: "▦",
   "+": "+",
 };
 
@@ -362,6 +393,7 @@ const routeContext: Record<string, { title: string; detail: string }> = {
   gyms: { title: "Gyms", detail: "Manage your fitness network" },
   flex: { title: "GYMRide Flex", detail: "Membership operations" },
   finance: { title: "Finance", detail: "Earnings and settlements" },
+  "gym-os": { title: "GymOS", detail: "Paid gym-management workspace" },
   bookings: { title: "Bookings", detail: "Reservations and attendance" },
   reviews: { title: "Reviews", detail: "Member feedback" },
   notifications: { title: "Notifications", detail: "Updates and activity" },
