@@ -187,7 +187,14 @@ function AuthProvider({
       },
       reloadProfile,
     }),
-    [allowAuthenticatedWithoutRole, allowedRoles, api, queryClient, user],
+    [
+      allowAuthenticatedWithoutRole,
+      allowedRoles,
+      api,
+      queryClient,
+      status,
+      user,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

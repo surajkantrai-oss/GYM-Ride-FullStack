@@ -1,4 +1,5 @@
 "use client";
+import { createUuid } from "@gymride/api-client";
 import type { GymOsMemberCharge, GymOsMemberFinanceSummary, GymOsMemberPayment, GymSummary, PaginatedResponse } from "@gymride/types";
 import { ErrorState, PageHeader, PageState, StatusBadge, pushToast, useAuth } from "@gymride/web-ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,7 +15,7 @@ export default function GymOsPaymentsPage(){
  const charges=useQuery({queryKey:["gymos-charges",gym,search,bucket],enabled:!!gym,queryFn:()=>api.request<PaginatedResponse<GymOsMemberCharge>>(`/partner/gyms/${gym}/gym-os/charges?page=1&pageSize=100${search?`&search=${encodeURIComponent(search)}`:""}${bucket?`&dueBucket=${bucket}`:""}`)});
  const payments=useQuery({queryKey:["gymos-payments",gym],enabled:!!gym,queryFn:()=>api.request<PaginatedResponse<GymOsMemberPayment>>(`/partner/gyms/${gym}/gym-os/payments?page=1&pageSize=100`)});
  const refresh=()=>Promise.all([cache.invalidateQueries({queryKey:["gymos-finance-summary"]}),cache.invalidateQueries({queryKey:["gymos-charges"]}),cache.invalidateQueries({queryKey:["gymos-payments"]})]);
- const record=useMutation({mutationFn:()=>api.request<{receipt:{receiptNumber:string};remainingDueMinor:number}>(`/partner/gyms/${gym}/gym-os/payments`,{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({chargeId,amountMinor:Math.round(Number(amount)*100),method,reference:reference||undefined})}),onSuccess:async(v)=>{pushToast("Payment recorded",`${v.receipt.receiptNumber} · ${money(v.remainingDueMinor)} remaining`);setAmount("");await refresh();}});
+ const record=useMutation({mutationFn:()=>api.request<{receipt:{receiptNumber:string};remainingDueMinor:number}>(`/partner/gyms/${gym}/gym-os/payments`,{method:"POST",headers:{"Idempotency-Key":createUuid()},body:JSON.stringify({chargeId,amountMinor:Math.round(Number(amount)*100),method,reference:reference||undefined})}),onSuccess:async(v)=>{pushToast("Payment recorded",`${v.receipt.receiptNumber} · ${money(v.remainingDueMinor)} remaining`);setAmount("");await refresh();}});
  const reverse=useMutation({mutationFn:(id:string)=>api.request(`/partner/gyms/${gym}/gym-os/payments/${id}/reverse`,{method:"POST",body:JSON.stringify({reason:reversal})}),onSuccess:refresh});
  if(gyms.error)return <ErrorState error={gyms.error}/>;
  const metrics=summary.data?[['Collected today',summary.data.collectedTodayMinor],['This month',summary.data.collectedThisMonthMinor],['Outstanding',summary.data.outstandingMinor],['Overdue',summary.data.overdueMinor]]:[];

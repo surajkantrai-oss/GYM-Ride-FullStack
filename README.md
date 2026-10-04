@@ -75,6 +75,8 @@ The Admin and Partner portals use a shared contemporary SaaS shell, while the cu
 
 PostgreSQL and Redis may be native services or the preserved Compose configuration; Docker is not required by the application code.
 
+For the complete containerized local stack, install Docker Desktop (or another Docker Engine with Compose v2) and follow [the local Docker deployment guide](infrastructure/docker/README.md). The Compose stack builds the production NestJS and standalone Next.js artifacts, applies committed migrations, runs the idempotent system seed, and keeps PostgreSQL data in a named volume. The Expo mobile application remains outside Docker.
+
 ## Environment setup
 
 ```bash

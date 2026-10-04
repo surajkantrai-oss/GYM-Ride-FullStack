@@ -24,6 +24,22 @@ export class ApiError extends Error {
   }
 }
 
+export function createUuid() {
+  const cryptoApi = globalThis.crypto;
+  if (typeof cryptoApi?.randomUUID === "function")
+    return cryptoApi.randomUUID();
+  if (typeof cryptoApi?.getRandomValues !== "function")
+    throw new Error("Secure random number generation is not available.");
+
+  const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 export function createGymRideApi(client: ApiClient) {
   return {
     plans: {
@@ -189,7 +205,7 @@ export class ApiClient {
     if (!this.baseUrl)
       throw new ApiError("NEXT_PUBLIC_API_BASE_URL is not configured", 0);
     const headers = new Headers(init.headers);
-    headers.set("x-request-id", crypto.randomUUID());
+    headers.set("x-request-id", createUuid());
     if (init.body && !(init.body instanceof FormData))
       headers.set("content-type", "application/json");
     if (this.accessToken)
