@@ -36,6 +36,8 @@ describe("GymOS partner visibility", () => {
     expect(canManageGymOsMembers(["GYM_OWNER"])).toBe(true);
     expect(canManageGymOsMembers(["GYM_MANAGER"])).toBe(true);
     expect(canManageGymOsMembers(["GYM_STAFF"])).toBe(false);
+    expect(canManageGymOsMembers(["ADMIN"])).toBe(true);
+    expect(canManageGymOsMembers(["SUPER_ADMIN"])).toBe(true);
   });
   it("classifies member capacity", () => {
     expect(memberCapacityState(145, 150)).toBe("near");
@@ -53,6 +55,7 @@ describe("GymOS partner visibility", () => {
     expect(canOperateGymOsAttendance(["GYM_OWNER"])).toBe(true);
     expect(canOperateGymOsAttendance(["GYM_MANAGER"])).toBe(true);
     expect(canOperateGymOsAttendance(["GYM_STAFF"])).toBe(true);
+    expect(canOperateGymOsAttendance(["ADMIN"])).toBe(true);
     expect(canOperateGymOsAttendance(["CUSTOMER"])).toBe(false);
   });
   it("builds deterministic bounded attendance windows", () => {

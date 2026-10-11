@@ -17,7 +17,13 @@ import {
   useMemo,
   useState,
 } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
+import {
+  getCountries,
+  getCountryCallingCode,
+  type Country,
+} from "react-phone-number-input";
+import { parsePhoneNumberFromString } from "libphonenumber-js";
 import type { z } from "zod";
 
 export const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
@@ -187,7 +193,14 @@ function AuthProvider({
       },
       reloadProfile,
     }),
-    [allowAuthenticatedWithoutRole, allowedRoles, api, queryClient, user],
+    [
+      allowAuthenticatedWithoutRole,
+      allowedRoles,
+      api,
+      queryClient,
+      status,
+      user,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -237,6 +250,7 @@ export function LoginScreen({
   const [serverError, setServerError] = useState("");
   const phoneForm = useForm<z.infer<typeof phoneSchema>>({
     resolver: zodResolver(phoneSchema),
+    defaultValues: { phone: "" },
   });
   const otpForm = useForm<z.infer<typeof otpSchema>>({
     resolver: zodResolver(otpSchema),
@@ -321,11 +335,16 @@ export function LoginScreen({
               label="Mobile number"
               error={phoneForm.formState.errors.phone?.message}
             >
-              <input
-                autoFocus
-                autoComplete="tel"
-                placeholder="+919876543210"
-                {...phoneForm.register("phone")}
+              <Controller
+                control={phoneForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <CountryPhoneInput
+                    value={field.value}
+                    onChange={field.onChange}
+                    invalid={!!phoneForm.formState.errors.phone}
+                  />
+                )}
               />
             </Field>
             <button disabled={phoneForm.formState.isSubmitting}>
@@ -364,6 +383,104 @@ export function LoginScreen({
         </p>
       </section>
     </main>
+  );
+}
+
+const countryNames =
+  typeof Intl.DisplayNames === "function"
+    ? new Intl.DisplayNames(["en"], { type: "region" })
+    : null;
+
+function countryFlag(country: Country) {
+  return String.fromCodePoint(
+    ...country.split("").map((letter) => 127397 + letter.charCodeAt(0)),
+  );
+}
+
+const phoneCountries = getCountries()
+  .map((country) => ({
+    country,
+    callingCode: getCountryCallingCode(country),
+    name: countryNames?.of(country) ?? country,
+  }))
+  .sort((a, b) => a.name.localeCompare(b.name));
+
+export function CountryPhoneInput({
+  value,
+  onChange,
+  invalid = false,
+}: {
+  value: string;
+  onChange(value: string): void;
+  invalid?: boolean;
+}) {
+  const parsed = value ? parsePhoneNumberFromString(value) : undefined;
+  const initialCountry = parsed?.country ?? "IN";
+  const [country, setCountry] = useState<Country>(initialCountry);
+  const [localNumber, setLocalNumber] = useState(() => {
+    if (parsed?.country === initialCountry) return parsed.nationalNumber;
+    const prefix = `+${getCountryCallingCode(initialCountry)}`;
+    return value.startsWith(prefix)
+      ? value.slice(prefix.length).replace(/\D/g, "")
+      : value.replace(/\D/g, "");
+  });
+  const selected = phoneCountries.find((item) => item.country === country)!;
+  const label = `${countryFlag(country)} ${selected.name} (+${selected.callingCode})`;
+  const [countrySearch, setCountrySearch] = useState(label);
+
+  const updateNumber = (nextCountry: Country, local: string) => {
+    const digits = local.replace(/\D/g, "");
+    setLocalNumber(digits);
+    onChange(digits ? `+${getCountryCallingCode(nextCountry)}${digits}` : "");
+  };
+
+  return (
+    <div className="phone-input" aria-invalid={invalid || undefined}>
+      <div className="phone-country">
+        <input
+          aria-label="Country or dialing code"
+          autoComplete="country-name"
+          list="gymride-phone-countries"
+          type="search"
+          value={countrySearch}
+          onChange={(event) => {
+            const nextSearch = event.target.value;
+            setCountrySearch(nextSearch);
+            const match = phoneCountries.find(
+              (item) =>
+                `${countryFlag(item.country)} ${item.name} (+${item.callingCode})` ===
+                nextSearch,
+            );
+            if (match) {
+              setCountry(match.country);
+              updateNumber(match.country, localNumber);
+            }
+          }}
+          onBlur={() => setCountrySearch(label)}
+        />
+        <datalist id="gymride-phone-countries">
+          {phoneCountries.map((item) => (
+            <option
+              key={item.country}
+              value={`${countryFlag(item.country)} ${item.name} (+${item.callingCode})`}
+            />
+          ))}
+        </datalist>
+      </div>
+      <span className="phone-dial-code" aria-hidden="true">
+        +{selected.callingCode}
+      </span>
+      <input
+        autoFocus
+        aria-label="Local mobile number"
+        aria-invalid={invalid || undefined}
+        autoComplete="tel-national"
+        inputMode="tel"
+        placeholder={country === "IN" ? "9876543210" : "Phone number"}
+        value={localNumber}
+        onChange={(event) => updateNumber(country, event.target.value)}
+      />
+    </div>
   );
 }
 
@@ -417,7 +534,9 @@ export function AppShell({
   const context = routeContext[routeKey] ?? routeContext.dashboard;
   return (
     <div className={`app-frame app-frame-${appName.toLowerCase()}`}>
-      <a className="skip-link" href="#main-content">Skip to content</a>
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <aside className="sidebar">
         <a className="brand" href="/dashboard">
           <span className="brand-mark">GR</span>
@@ -431,14 +550,27 @@ export function AppShell({
             <a
               href={item.href}
               key={item.href}
+              className={
+                item.href.startsWith("/gym-os/") ? "nav-item-nested" : undefined
+              }
               aria-current={
                 currentPath === item.href ||
-                (item.href !== "/dashboard" && currentPath.startsWith(`${item.href}/`))
+                (item.href !== "/dashboard" &&
+                  currentPath.startsWith(`${item.href}/`) &&
+                  !nav.some(
+                    (candidate) =>
+                      candidate.href !== item.href &&
+                      candidate.href.startsWith(`${item.href}/`) &&
+                      (currentPath === candidate.href ||
+                        currentPath.startsWith(`${candidate.href}/`)),
+                  ))
                   ? "page"
                   : undefined
               }
             >
-              <span aria-hidden="true">{navIcons[item.short] ?? item.short}</span>
+              <span aria-hidden="true">
+                {navIcons[item.short] ?? item.short}
+              </span>
               {item.label}
             </a>
           ))}
@@ -459,16 +591,26 @@ export function AppShell({
           </div>
           <div className="desktop-header-actions">
             {appName === "Partner" && (
-              <a className="header-icon" href="/notifications" aria-label="Notifications">
+              <a
+                className="header-icon"
+                href="/notifications"
+                aria-label="Notifications"
+              >
                 <span aria-hidden="true">●</span>
               </a>
             )}
             <div className="desktop-header-user" aria-label="Signed in user">
-            <span>{displayName(user).slice(0, 1).toUpperCase()}</span>
-            <div>
-              <strong>{displayName(user)}</strong>
-              <small>{user?.roles.join(" · ")}</small>
-            </div>
+              <span className="user-avatar">
+                {user?.avatarUrl ? (
+                  <img src={user.avatarUrl} alt="" />
+                ) : (
+                  displayName(user).slice(0, 1).toUpperCase()
+                )}
+              </span>
+              <div>
+                <strong>{displayName(user)}</strong>
+                <small>{user?.roles.join(" · ")}</small>
+              </div>
             </div>
           </div>
         </header>
@@ -477,7 +619,9 @@ export function AppShell({
             GYMRide · {appName}
           </a>
         </header>
-        <main className="page" id="main-content">{children}</main>
+        <main className="page" id="main-content">
+          {children}
+        </main>
       </div>
     </div>
   );
@@ -525,7 +669,9 @@ export function PageState({
 }) {
   return (
     <section className="page-state">
-      <div className="state-icon" aria-hidden="true">◇</div>
+      <div className="state-icon" aria-hidden="true">
+        ◇
+      </div>
       <h2>{title}</h2>
       {detail && <p>{detail}</p>}
       {action}

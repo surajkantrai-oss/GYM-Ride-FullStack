@@ -24,6 +24,8 @@ export interface UserProfile {
   lastName: string | null;
   email: string | null;
   roles: RoleName[];
+  avatarUrl?: string | null;
+  profilePhotoUpdatedAt?: string | null;
 }
 
 export interface Tokens {
@@ -84,6 +86,18 @@ export interface GymSummary {
   branches?: GymBranch[];
   createdAt?: string;
   updatedAt?: string;
+  images?: GymImage[];
+}
+
+export interface GymImage {
+  id: string;
+  kind: "COVER" | "GALLERY";
+  sortOrder: number;
+  mimeType: string;
+  width: number;
+  height: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PageMeta {
@@ -706,6 +720,7 @@ export interface PublicGym {
   branches: PublicBranch[];
   averageRating?: number | null;
   reviewCount?: number;
+  images?: GymImage[];
 }
 export interface NearbyGym {
   gymId: string;
@@ -715,6 +730,7 @@ export interface NearbyGym {
   amenities: string[];
   averageRating?: number | null;
   reviewCount?: number;
+  coverImage?: GymImage | null;
 }
 
 export type ReviewStatus = "PUBLISHED" | "HIDDEN" | "REMOVED";

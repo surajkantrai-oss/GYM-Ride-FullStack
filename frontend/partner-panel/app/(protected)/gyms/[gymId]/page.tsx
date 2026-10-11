@@ -12,7 +12,7 @@ import {
   StatusBadge,
   pushToast,
 } from "@gymride/web-ui";
-import { api } from "@/lib/api";
+import { api, gymImageUrl } from "@/lib/api";
 import { canEditGym, submissionRequirementLabel } from "@/lib/submission";
 export default function GymPage() {
   const gymId = useParams<{ gymId: string }>().gymId;
@@ -73,6 +73,28 @@ export default function GymPage() {
           <div>{gym.statusReason}</div>
         </div>
       )}
+      <section className="gym-profile-media" aria-label={`${gym.name} photos`}>
+        {gym.images?.length ? (
+          <>
+            <img
+              className="gym-profile-cover"
+              src={gymImageUrl((gym.images.find((image) => image.kind === "COVER") ?? gym.images[0]).id)}
+              alt={`${gym.name} cover`}
+            />
+            {gym.images.length > 1 && (
+              <div className="gym-profile-gallery">
+                {gym.images
+                  .filter((image) => image.id !== (gym.images?.find((item) => item.kind === "COVER") ?? gym.images?.[0])?.id)
+                  .map((image, index) => (
+                    <img key={image.id} src={gymImageUrl(image.id)} alt={`${gym.name} gallery photo ${index + 1}`} />
+                  ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="gym-image-placeholder">No gym photos yet</div>
+        )}
+      </section>
       {missing.length > 0 && (
         <section className="reason-box">
           <strong>Complete these requirements</strong>

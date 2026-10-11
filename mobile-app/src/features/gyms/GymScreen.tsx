@@ -54,7 +54,13 @@ export function GymScreen({
       {gym.data && (
         <>
           <View style={local.heroWrap}>
-            <Image source={gymVisual(gym.data.id)} style={local.hero} />
+            <Image
+              source={gymVisual(
+                gym.data.id,
+                (gym.data.images?.find((image) => image.kind === "COVER") ?? gym.data.images?.[0])?.id,
+              )}
+              style={local.hero}
+            />
             <View style={local.heroShade} />
             <View style={local.heroBadge}>
               <Badge

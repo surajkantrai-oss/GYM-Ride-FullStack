@@ -19,12 +19,12 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { canManageGymOsMembers } from "@/lib/gym-os";
+import { useSelectedGym } from "@/lib/selected-gym";
 
 export default function GymOsMembersPage() {
   const cache = useQueryClient(),
     { user } = useAuth();
-  const [gym, setGym] = useState(""),
-    [search, setSearch] = useState(""),
+  const [search, setSearch] = useState(""),
     [status, setStatus] = useState(""),
     [page, setPage] = useState(1),
     [form, setForm] = useState(false),
@@ -39,7 +39,7 @@ export default function GymOsMembersPage() {
         "/partner/gyms?page=1&limit=100",
       ),
   });
-  const gymId = gym || gyms.data?.data[0]?.id || "";
+  const [gymId, setGym] = useSelectedGym(gyms.data?.data);
   const selectedGym = gyms.data?.data.find((item) => item.id === gymId);
   const summary = useQuery({
     queryKey: ["member-summary", gymId],
@@ -101,6 +101,7 @@ export default function GymOsMembersPage() {
     },
   });
   const canWrite = canManageGymOsMembers(user?.roles ?? []);
+  const moduleError = summary.error || members.error;
   if (gyms.isLoading) return <PageState title="Loading members…" />;
   return (
     <>
@@ -111,7 +112,7 @@ export default function GymOsMembersPage() {
         action={
           canWrite ? (
             <button
-              disabled={summary.data?.remainingCapacity === 0}
+              disabled={!!moduleError || summary.data?.remainingCapacity === 0}
               onClick={() => setForm(true)}
             >
               Add member
@@ -139,8 +140,11 @@ export default function GymOsMembersPage() {
           <option>ARCHIVED</option>
         </select>
       </section>
-      {summary.error ? (
-        <ErrorState error={summary.error} />
+      {moduleError ? (
+        <ErrorState
+          error={moduleError}
+          retry={() => void Promise.all([summary.refetch(), members.refetch()])}
+        />
       ) : (
         summary.data && (
           <>
@@ -170,7 +174,7 @@ export default function GymOsMembersPage() {
           </>
         )
       )}
-      {form && (
+      {!moduleError && form && (
         <section className="panel">
           <h2>Add member</h2>
           <form
@@ -233,104 +237,112 @@ export default function GymOsMembersPage() {
           </form>
         </section>
       )}
-      {members.isLoading ? (
-        <PageState title="Loading directory…" />
-      ) : members.error ? (
-        <ErrorState error={members.error} />
-      ) : !members.data?.data.length ? (
-        <PageState title="No members found" />
-      ) : (
-        <section className="panel table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Member</th>
-                <th>Code</th>
-                <th>Phone</th>
-                <th>Branch</th>
-                <th>Status</th>
-                <th>Joined</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.data.data.map((m) => (
-                <tr key={m.id}>
-                  <td>
-                    <Link href={`/gym-os/members/${m.id}?gymId=${gymId}`}>
-                      <b>
-                        {m.firstName} {m.lastName}
-                      </b>
-                    </Link>
-                    <br />
-                    <small>{m.email || "No email"}</small>
-                  </td>
-                  <td>{m.memberCode}</td>
-                  <td>{m.phone}</td>
-                  <td>{m.primaryBranch?.name || "—"}</td>
-                  <td>
-                    <StatusBadge status={m.status} />
-                  </td>
-                  <td>
-                    {m.joinedAt
-                      ? new Date(m.joinedAt).toLocaleDateString("en-IN")
-                      : "—"}
-                  </td>
-                  <td>
-                    {canWrite && m.status !== "ARCHIVED" && (
-                      <div className="filter-row">
-                        {m.status === "ACTIVE" ? (
-                          <button
-                            className="button-secondary"
-                            onClick={() =>
-                              change.mutate({ id: m.id, action: "deactivate" })
-                            }
-                          >
-                            Deactivate
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() =>
-                              change.mutate({ id: m.id, action: "reactivate" })
-                            }
-                          >
-                            Reactivate
-                          </button>
-                        )}
-                        <button
-                          className="button-danger"
-                          onClick={() =>
-                            confirm("Archive this member?") &&
-                            change.mutate({ id: m.id, action: "archive" })
-                          }
-                        >
-                          Archive
-                        </button>
-                      </div>
-                    )}
-                  </td>
+      {!moduleError &&
+        (members.isLoading ? (
+          <PageState title="Loading directory…" />
+        ) : !members.data?.data.length ? (
+          <PageState title="No members found" />
+        ) : (
+          <section className="panel table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Member</th>
+                  <th>Code</th>
+                  <th>Phone</th>
+                  <th>Branch</th>
+                  <th>Status</th>
+                  <th>Joined</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="filter-row">
-            <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </button>
-            <span>
-              Page {members.data.meta.page} of{" "}
-              {members.data.meta.totalPages || 1}
-            </span>
-            <button
-              disabled={page >= members.data.meta.totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </button>
-          </div>
-        </section>
-      )}
-      {canWrite && (
+              </thead>
+              <tbody>
+                {members.data.data.map((m) => (
+                  <tr key={m.id}>
+                    <td>
+                      <Link href={`/gym-os/members/${m.id}?gymId=${gymId}`}>
+                        <b>
+                          {m.firstName} {m.lastName}
+                        </b>
+                      </Link>
+                      <br />
+                      <small>{m.email || "No email"}</small>
+                    </td>
+                    <td>{m.memberCode}</td>
+                    <td>{m.phone}</td>
+                    <td>{m.primaryBranch?.name || "—"}</td>
+                    <td>
+                      <StatusBadge status={m.status} />
+                    </td>
+                    <td>
+                      {m.joinedAt
+                        ? new Date(m.joinedAt).toLocaleDateString("en-IN")
+                        : "—"}
+                    </td>
+                    <td>
+                      {canWrite && m.status !== "ARCHIVED" && (
+                        <div className="filter-row">
+                          {m.status === "ACTIVE" ? (
+                            <button
+                              className="button-secondary"
+                              onClick={() =>
+                                change.mutate({
+                                  id: m.id,
+                                  action: "deactivate",
+                                })
+                              }
+                            >
+                              Deactivate
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                change.mutate({
+                                  id: m.id,
+                                  action: "reactivate",
+                                })
+                              }
+                            >
+                              Reactivate
+                            </button>
+                          )}
+                          <button
+                            className="button-danger"
+                            onClick={() =>
+                              confirm("Archive this member?") &&
+                              change.mutate({ id: m.id, action: "archive" })
+                            }
+                          >
+                            Archive
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="filter-row">
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                Previous
+              </button>
+              <span>
+                Page {members.data.meta.page} of{" "}
+                {members.data.meta.totalPages || 1}
+              </span>
+              <button
+                disabled={page >= members.data.meta.totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </section>
+        ))}
+      {!moduleError && canWrite && (
         <section className="panel">
           <h2>CSV import</h2>
           <p className="muted">

@@ -1,0 +1,107 @@
+name: gymride
+
+x-backend-environment: &backend-environment
+  NODE_ENV: ${NODE_ENV:-development}
+  PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-development}
+  PUSH_PROVIDER: ${PUSH_PROVIDER:-development}
+  NOTIFICATION_QUEUE_ENABLED: ${NOTIFICATION_QUEUE_ENABLED:-false}
+  BOOKING_QUEUE_ENABLED: ${BOOKING_QUEUE_ENABLED:-false}
+  CHECK_IN_QUEUE_ENABLED: ${CHECK_IN_QUEUE_ENABLED:-false}
+  GYMOS_REMINDER_QUEUE_ENABLED: ${GYMOS_REMINDER_QUEUE_ENABLED:-false}
+  GYMOS_RECONCILIATION_ENABLED: ${GYMOS_RECONCILIATION_ENABLED:-true}
+  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be present in .env.docker}
+  REDIS_HOST: ${REDIS_HOST:-redis}
+  REDIS_PORT: ${REDIS_PORT:-6379}
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  PORT: 3000
+  CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be present in .env.docker}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  THROTTLE_TTL_MS: ${THROTTLE_TTL_MS:-60000}
+  THROTTLE_LIMIT: ${THROTTLE_LIMIT:-100}
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET must be present in .env.docker}
+  JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be present in .env.docker}
+  JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS:-900}
+  JWT_REFRESH_TTL_SECONDS: ${JWT_REFRESH_TTL_SECONDS:-2592000}
+  OTP_HASH_SECRET: ${OTP_HASH_SECRET:?OTP_HASH_SECRET must be present in .env.docker}
+  OTP_TTL_SECONDS: ${OTP_TTL_SECONDS:-300}
+  OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}
+  OTP_RESEND_COOLDOWN_SECONDS: ${OTP_RESEND_COOLDOWN_SECONDS:-45}
+  OTP_REQUEST_LIMIT: ${OTP_REQUEST_LIMIT:-5}
+  OTP_REQUEST_WINDOW_SECONDS: ${OTP_REQUEST_WINDOW_SECONDS:-3600}
+  CHECK_IN_TOKEN_SECRET: ${CHECK_IN_TOKEN_SECRET:?CHECK_IN_TOKEN_SECRET must be present in .env.docker}
+  CHECK_IN_TOKEN_TTL_SECONDS: ${CHECK_IN_TOKEN_TTL_SECONDS:-180}
+  CHECK_IN_OPEN_BEFORE_MINUTES: ${CHECK_IN_OPEN_BEFORE_MINUTES:-15}
+  CHECK_IN_CLOSE_AFTER_MINUTES: ${CHECK_IN_CLOSE_AFTER_MINUTES:-30}
+  CHECK_IN_COMPLETION_GRACE_MINUTES: ${CHECK_IN_COMPLETION_GRACE_MINUTES:-15}
+  CHECK_IN_OTP_TTL_SECONDS: ${CHECK_IN_OTP_TTL_SECONDS:-180}
+  CHECK_IN_OTP_MAX_ATTEMPTS: ${CHECK_IN_OTP_MAX_ATTEMPTS:-5}
+  CHECK_IN_OTP_RESEND_COOLDOWN_SECONDS: ${CHECK_IN_OTP_RESEND_COOLDOWN_SECONDS:-30}
+  CHECK_IN_OTP_REQUEST_LIMIT: ${CHECK_IN_OTP_REQUEST_LIMIT:-5}
+  CHECK_IN_OTP_REQUEST_WINDOW_SECONDS: ${CHECK_IN_OTP_REQUEST_WINDOW_SECONDS:-3600}
+  BOOKING_RESERVATION_TTL_SECONDS: ${BOOKING_RESERVATION_TTL_SECONDS:-600}
+  BOOKING_LOCK_TTL_SECONDS: ${BOOKING_LOCK_TTL_SECONDS:-15}
+  GYMOS_ATTENDANCE_QR_TTL_SECONDS: ${GYMOS_ATTENDANCE_QR_TTL_SECONDS:-60}
+  GYMOS_ATTENDANCE_QR_RETENTION_HOURS: ${GYMOS_ATTENDANCE_QR_RETENTION_HOURS:-24}
+  DEFAULT_PLATFORM_COMMISSION_BPS: ${DEFAULT_PLATFORM_COMMISSION_BPS:-1500}
+  REFUND_MINIMUM_HOURS: ${REFUND_MINIMUM_HOURS:-2}
+  RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+  RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+  RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+  DEV_SEED_OWNER_PHONE: ${DEV_SEED_OWNER_PHONE:-}
+  DEV_SEED_ADMIN_PHONE: ${DEV_SEED_ADMIN_PHONE:-}
+  MEDIA_UPLOAD_MAX_BYTES: ${MEDIA_UPLOAD_MAX_BYTES:-8388608}
+
+services:
+  migrate:
+    image: ${ECR_REGISTRY:?Set ECR_REGISTRY}/${ECR_REPOSITORY_BACKEND:?Set ECR_REPOSITORY_BACKEND}:${IMAGE_TAG:?Set IMAGE_TAG}
+    command: ["./backend/node_modules/.bin/prisma", "migrate", "deploy", "--schema", "backend/prisma/schema.prisma"]
+    environment: *backend-environment
+    networks: [gymride]
+    restart: "no"
+
+  backend:
+    image: ${ECR_REGISTRY:?Set ECR_REGISTRY}/${ECR_REPOSITORY_BACKEND:?Set ECR_REPOSITORY_BACKEND}:${IMAGE_TAG:?Set IMAGE_TAG}
+    environment: *backend-environment
+    ports: ["3000:3000"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    init: true
+    networks: [gymride]
+    restart: unless-stopped
+
+  admin:
+    image: ${ECR_REGISTRY:?Set ECR_REGISTRY}/${ECR_REPOSITORY_ADMIN:?Set ECR_REPOSITORY_ADMIN}:${IMAGE_TAG:?Set IMAGE_TAG}
+    environment: {NODE_ENV: production, HOSTNAME: 0.0.0.0, PORT: 3001}
+    ports: ["3001:3001"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    init: true
+    networks: [gymride]
+    restart: unless-stopped
+
+  partner:
+    image: ${ECR_REGISTRY:?Set ECR_REGISTRY}/${ECR_REPOSITORY_PARTNER:?Set ECR_REPOSITORY_PARTNER}:${IMAGE_TAG:?Set IMAGE_TAG}
+    environment: {NODE_ENV: production, HOSTNAME: 0.0.0.0, PORT: 3002}
+    ports: ["3002:3002"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    init: true
+    networks: [gymride]
+    restart: unless-stopped
+
+networks:
+  gymride:
+    external: true
+    name: ${GYMRIDE_NETWORK:-gymride_gymride}

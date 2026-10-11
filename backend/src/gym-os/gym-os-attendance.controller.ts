@@ -20,13 +20,20 @@ import {
   AttendanceCheckInDto,
   AttendanceListDto,
   AttendanceQrCheckInDto,
+  CustomerAttendanceQrCheckInDto,
 } from './gym-os-attendance.dto';
 import { GymOsAttendanceService } from './gym-os-attendance.service';
 
 @ApiTags('Partner GymOS Attendance')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.GYM_STAFF)
+@Roles(
+  RoleName.GYM_OWNER,
+  RoleName.GYM_MANAGER,
+  RoleName.GYM_STAFF,
+  RoleName.ADMIN,
+  RoleName.SUPER_ADMIN,
+)
 @Controller('partner/gyms/:gymId/gym-os/attendance')
 export class PartnerGymOsAttendanceController {
   constructor(private readonly service: GymOsAttendanceService) {}
@@ -105,10 +112,30 @@ export class PartnerGymOsAttendanceController {
   }
 }
 
+@ApiTags('Customer GymOS Attendance')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(RoleName.CUSTOMER)
+@Controller('gym-os/attendance')
+export class CustomerGymOsAttendanceController {
+  constructor(private readonly service: GymOsAttendanceService) {}
+  @Post('qr/check-in')
+  @ApiOperation({ summary: 'Check the signed-in linked member into the QR token branch' })
+  checkIn(@CurrentUser() user: AuthUser, @Body() dto: CustomerAttendanceQrCheckInDto) {
+    return this.service.customerQrCheckIn(user, dto.token);
+  }
+}
+
 @ApiTags('Partner GymOS Member Attendance')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.GYM_STAFF)
+@Roles(
+  RoleName.GYM_OWNER,
+  RoleName.GYM_MANAGER,
+  RoleName.GYM_STAFF,
+  RoleName.ADMIN,
+  RoleName.SUPER_ADMIN,
+)
 @Controller('partner/gyms/:gymId/gym-os/members/:memberId/attendance')
 export class PartnerGymOsMemberAttendanceController {
   constructor(private readonly service: GymOsAttendanceService) {}

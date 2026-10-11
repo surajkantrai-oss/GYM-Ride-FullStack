@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ApiClient } from "@gymride/api-client";
+import { createUuid, type ApiClient } from "@gymride/api-client";
 import { ErrorState, PageHeader, PageState, StatusBadge } from "./index";
 
 type FinanceView =
@@ -178,7 +178,7 @@ export function FinanceWorkspace({
     setBusy(true);
     setActionError("");
     const fingerprint = JSON.stringify([path, body]);
-    const key = actionKeys.current.get(fingerprint) ?? crypto.randomUUID();
+    const key = actionKeys.current.get(fingerprint) ?? createUuid();
     actionKeys.current.set(fingerprint, key);
     try {
       await api.request(`${prefix}/${path}`, {

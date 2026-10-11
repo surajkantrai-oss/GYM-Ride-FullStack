@@ -16,11 +16,15 @@ export function hasGymOsAccess(status?: GymOsSubscriptionStatus): boolean {
 }
 
 export function canManageGymOsMembers(roles: RoleName[]): boolean {
-  return roles.some((role) => role === "GYM_OWNER" || role === "GYM_MANAGER");
+  return roles.some((role) =>
+    ["GYM_OWNER", "GYM_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(role),
+  );
 }
 export function canOperateGymOsAttendance(roles: RoleName[]): boolean {
   return roles.some((role) =>
-    ["GYM_OWNER", "GYM_MANAGER", "GYM_STAFF"].includes(role),
+    ["GYM_OWNER", "GYM_MANAGER", "GYM_STAFF", "ADMIN", "SUPER_ADMIN"].includes(
+      role,
+    ),
   );
 }
 
@@ -34,7 +38,9 @@ export function attendanceDateFrom(
     .slice(0, 10);
 }
 export function canReverseGymOsPayment(roles: RoleName[]): boolean {
-  return roles.some((role) => role === "GYM_OWNER" || role === "GYM_MANAGER");
+  return roles.some((role) =>
+    ["GYM_OWNER", "GYM_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(role),
+  );
 }
 export function remainingAfterPayment(outstandingMinor:number,paymentMinor:number):number{return Math.max(0,outstandingMinor-paymentMinor);}
 export function memberCapacityState(

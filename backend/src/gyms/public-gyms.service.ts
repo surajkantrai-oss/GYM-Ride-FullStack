@@ -6,11 +6,13 @@ import { DomainException } from '../common/errors/domain.exception';
 import { PrismaService } from '../database/prisma.service';
 import { GymListDto } from './dto/gym.dto';
 import { NearbyGymsDto } from './dto/nearby.dto';
+import { gymImageSelect } from './gym-images.service';
 
 const publicGymSelect = {
   id: true,
   name: true,
   description: true,
+  images: { select: gymImageSelect, orderBy: [{ kind: 'asc' }, { sortOrder: 'asc' }] },
   branches: {
     where: { status: BranchStatus.ACTIVE },
     select: {
@@ -114,6 +116,13 @@ export class PublicGymsService {
       WHERE g.status = 'APPROVED'::"GymStatus" AND b.status = 'ACTIVE'::"BranchStatus"
         AND ST_DWithin(b.location, ${point}, ${radiusMeters}) ${amenityClause}
       ORDER BY ST_Distance(b.location, ${point}) ASC, b.id ASC LIMIT ${query.limit} OFFSET ${offset}`);
+    const covers = rows.length
+      ? await this.prisma.gymImage.findMany({
+          where: { gymId: { in: [...new Set(rows.map((row) => row.gymId))] }, kind: 'COVER' },
+          select: { gymId: true, ...gymImageSelect },
+        })
+      : [];
+    const coverByGym = new Map(covers.map((image) => [image.gymId, image]));
     return {
       data: rows.map((row) => ({
         gymId: row.gymId,
@@ -129,6 +138,7 @@ export class PublicGymsService {
         amenities: row.amenities,
         averageRating: row.averageRating,
         reviewCount: row.reviewCount,
+        coverImage: coverByGym.get(row.gymId) ?? null,
       })),
       meta: { page: query.page, limit: query.limit, hasMore: rows.length === query.limit },
     };

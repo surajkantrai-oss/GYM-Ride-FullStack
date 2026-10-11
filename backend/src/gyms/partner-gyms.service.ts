@@ -15,6 +15,7 @@ import { PrismaService } from '../database/prisma.service';
 import { GymAccessService } from '../gym-access/gym-access.service';
 import { CreateGymDto, PartnerGymListDto, UpdateGymDto } from './dto/gym.dto';
 import { ownerCanEdit } from './gym-state';
+import { gymImageSelect } from './gym-images.service';
 
 const privateGymSelect = {
   id: true,
@@ -28,6 +29,7 @@ const privateGymSelect = {
   createdAt: true,
   updatedAt: true,
   branches: { select: { id: true, name: true, city: true, status: true } },
+  images: { select: gymImageSelect, orderBy: [{ kind: 'asc' }, { sortOrder: 'asc' }] },
 } satisfies Prisma.GymSelect;
 
 @Injectable()

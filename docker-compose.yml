@@ -1,38 +1,210 @@
 name: gymride
+
+x-backend-environment: &backend-environment
+  NODE_ENV: ${NODE_ENV:-development}
+  PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-development}
+  PUSH_PROVIDER: ${PUSH_PROVIDER:-development}
+  NOTIFICATION_QUEUE_ENABLED: ${NOTIFICATION_QUEUE_ENABLED:-false}
+  BOOKING_QUEUE_ENABLED: ${BOOKING_QUEUE_ENABLED:-false}
+  CHECK_IN_QUEUE_ENABLED: ${CHECK_IN_QUEUE_ENABLED:-false}
+  GYMOS_REMINDER_QUEUE_ENABLED: ${GYMOS_REMINDER_QUEUE_ENABLED:-false}
+  GYMOS_RECONCILIATION_ENABLED: ${GYMOS_RECONCILIATION_ENABLED:-true}
+  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.docker}
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  PORT: 3000
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001,http://localhost:3002}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  THROTTLE_TTL_MS: ${THROTTLE_TTL_MS:-60000}
+  THROTTLE_LIMIT: ${THROTTLE_LIMIT:-100}
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set JWT_ACCESS_SECRET in .env.docker}
+  JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET in .env.docker}
+  JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS:-900}
+  JWT_REFRESH_TTL_SECONDS: ${JWT_REFRESH_TTL_SECONDS:-2592000}
+  OTP_HASH_SECRET: ${OTP_HASH_SECRET:?Set OTP_HASH_SECRET in .env.docker}
+  OTP_TTL_SECONDS: ${OTP_TTL_SECONDS:-300}
+  OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}
+  OTP_RESEND_COOLDOWN_SECONDS: ${OTP_RESEND_COOLDOWN_SECONDS:-45}
+  OTP_REQUEST_LIMIT: ${OTP_REQUEST_LIMIT:-5}
+  OTP_REQUEST_WINDOW_SECONDS: ${OTP_REQUEST_WINDOW_SECONDS:-3600}
+  CHECK_IN_TOKEN_SECRET: ${CHECK_IN_TOKEN_SECRET:?Set CHECK_IN_TOKEN_SECRET in .env.docker}
+  CHECK_IN_TOKEN_TTL_SECONDS: ${CHECK_IN_TOKEN_TTL_SECONDS:-180}
+  CHECK_IN_OPEN_BEFORE_MINUTES: ${CHECK_IN_OPEN_BEFORE_MINUTES:-15}
+  CHECK_IN_CLOSE_AFTER_MINUTES: ${CHECK_IN_CLOSE_AFTER_MINUTES:-30}
+  CHECK_IN_COMPLETION_GRACE_MINUTES: ${CHECK_IN_COMPLETION_GRACE_MINUTES:-15}
+  CHECK_IN_OTP_TTL_SECONDS: ${CHECK_IN_OTP_TTL_SECONDS:-180}
+  CHECK_IN_OTP_MAX_ATTEMPTS: ${CHECK_IN_OTP_MAX_ATTEMPTS:-5}
+  CHECK_IN_OTP_RESEND_COOLDOWN_SECONDS: ${CHECK_IN_OTP_RESEND_COOLDOWN_SECONDS:-30}
+  CHECK_IN_OTP_REQUEST_LIMIT: ${CHECK_IN_OTP_REQUEST_LIMIT:-5}
+  CHECK_IN_OTP_REQUEST_WINDOW_SECONDS: ${CHECK_IN_OTP_REQUEST_WINDOW_SECONDS:-3600}
+  BOOKING_RESERVATION_TTL_SECONDS: ${BOOKING_RESERVATION_TTL_SECONDS:-600}
+  BOOKING_LOCK_TTL_SECONDS: ${BOOKING_LOCK_TTL_SECONDS:-15}
+  GYMOS_ATTENDANCE_QR_TTL_SECONDS: ${GYMOS_ATTENDANCE_QR_TTL_SECONDS:-60}
+  GYMOS_ATTENDANCE_QR_RETENTION_HOURS: ${GYMOS_ATTENDANCE_QR_RETENTION_HOURS:-24}
+  DEFAULT_PLATFORM_COMMISSION_BPS: ${DEFAULT_PLATFORM_COMMISSION_BPS:-1500}
+  REFUND_MINIMUM_HOURS: ${REFUND_MINIMUM_HOURS:-2}
+  RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+  RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+  RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+  DEV_SEED_OWNER_PHONE: ${DEV_SEED_OWNER_PHONE:-}
+  DEV_SEED_ADMIN_PHONE: ${DEV_SEED_ADMIN_PHONE:-}
+
+x-backend-tooling: &backend-tooling
+  build:
+    context: .
+    dockerfile: infrastructure/docker/backend.Dockerfile
+    target: tooling
+  environment: *backend-environment
+  networks: [gymride]
+  restart: "no"
+
 services:
   postgres:
-    image: postgis/postgis:16-3.5-alpine
+    image: ghcr.io/baosystems/postgis:16-3.5
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-gymride}
       POSTGRES_USER: ${POSTGRES_USER:-gymride}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gymride_dev_password}
-    ports:
-      - "5432:5432"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.docker}
+    expose:
+      - "5432"
     volumes:
       - gymride_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
+      start_period: 10s
     networks: [gymride]
+    restart: unless-stopped
+
   redis:
     image: redis:7.4-alpine
-    command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "6379:6379"
-    volumes:
-      - gymride_redis_data:/data
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    expose:
+      - "6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 20
     networks: [gymride]
+    restart: unless-stopped
+
+  migrate:
+    <<: *backend-tooling
+    command: ["pnpm", "--filter", "@gymride/backend", "prisma:deploy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  seed:
+    <<: *backend-tooling
+    command: ["pnpm", "--filter", "@gymride/backend", "prisma:seed"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  backend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/backend.Dockerfile
+      target: runtime
+    environment: *backend-environment
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    init: true
+    networks: [gymride]
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/admin.Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api/v1}
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3001
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api/v1}
+    ports:
+      - "3001:3001"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    init: true
+    networks: [gymride]
+    restart: unless-stopped
+
+  partner:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/partner.Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api/v1}
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3002
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api/v1}
+    ports:
+      - "3002:3002"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3002').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    init: true
+    networks: [gymride]
+    restart: unless-stopped
 
 volumes:
   gymride_postgres_data:
-  gymride_redis_data:
 
 networks:
   gymride:

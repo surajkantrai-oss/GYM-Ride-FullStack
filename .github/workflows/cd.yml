@@ -1,0 +1,289 @@
+name: GYMRide CD
+
+on:
+  workflow_run:
+    workflows: [GYMRide CI]
+    types: [completed]
+    branches: [development_server]
+  workflow_dispatch:
+    inputs:
+      rollback_sha:
+        description: Known-good 40-character commit SHA to redeploy (application images only)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: gymride-development-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy the CI-approved commit
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'development_server' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: development
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      ECR_REPOSITORY_BACKEND: ${{ vars.ECR_REPOSITORY_BACKEND }}
+      ECR_REPOSITORY_ADMIN: ${{ vars.ECR_REPOSITORY_ADMIN }}
+      ECR_REPOSITORY_PARTNER: ${{ vars.ECR_REPOSITORY_PARTNER }}
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      GYMRIDE_NETWORK: ${{ vars.GYMRIDE_NETWORK }}
+      NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+      BACKEND_HEALTH_URL: ${{ vars.BACKEND_HEALTH_URL }}
+      ADMIN_HEALTH_URL: ${{ vars.ADMIN_HEALTH_URL }}
+      PARTNER_HEALTH_URL: ${{ vars.PARTNER_HEALTH_URL }}
+
+    steps:
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(AWS_REGION AWS_ROLE_ARN ECR_REPOSITORY_BACKEND ECR_REPOSITORY_ADMIN ECR_REPOSITORY_PARTNER EC2_INSTANCE_ID DEPLOY_PATH NEXT_PUBLIC_API_BASE_URL BACKEND_HEALTH_URL ADMIN_HEALTH_URL PARTNER_HEALTH_URL)
+          for name in "${required[@]}"; do
+            [[ -n "${!name:-}" ]] || { echo "Missing GitHub environment variable: ${name}" >&2; exit 1; }
+          done
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$AWS_REGION" =~ ^[a-z]{2}(-gov)?-[a-z]+-[0-9]+$ ]]
+          [[ "$AWS_ROLE_ARN" =~ ^arn:aws(-[a-z]+)?:iam::[0-9]{12}:role/.+$ ]]
+          [[ "$EC2_INSTANCE_ID" =~ ^i-[0-9a-f]+$ ]]
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]
+          for repo in "$ECR_REPOSITORY_BACKEND" "$ECR_REPOSITORY_ADMIN" "$ECR_REPOSITORY_PARTNER"; do
+            [[ "$repo" =~ ^[a-z0-9]+([._/-][a-z0-9]+)*$ ]]
+          done
+
+      - name: Confirm this is still the development branch head
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const expected = process.env.DEPLOY_SHA;
+            const { data } = await github.rest.repos.getBranch({
+              owner: context.repo.owner, repo: context.repo.repo, branch: 'development_server'
+            });
+            if (data.commit.sha !== expected) {
+              core.setFailed(`Refusing stale deployment: CI passed ${expected}, current branch head is ${data.commit.sha}`);
+            }
+
+      - name: Checkout the exact commit that passed CI
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+
+      - name: Verify checkout
+        run: test "$(git rev-parse HEAD)" = "$DEPLOY_SHA"
+
+      - name: Configure AWS credentials with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Check for an existing Backend image
+        id: backend-image
+        run: |
+          if aws ecr describe-images --repository-name "$ECR_REPOSITORY_BACKEND" --image-ids "imageTag=$DEPLOY_SHA" >/dev/null 2>&1; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push Backend
+        if: steps.backend-image.outputs.exists != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/docker/backend.Dockerfile
+          target: runtime
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ env.DEPLOY_SHA }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Check for an existing Admin image
+        id: admin-image
+        run: |
+          if aws ecr describe-images --repository-name "$ECR_REPOSITORY_ADMIN" --image-ids "imageTag=$DEPLOY_SHA" >/dev/null 2>&1; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push Admin
+        if: steps.admin-image.outputs.exists != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/docker/admin.Dockerfile
+          target: runtime
+          push: true
+          build-args: NEXT_PUBLIC_API_BASE_URL=${{ env.NEXT_PUBLIC_API_BASE_URL }}
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_ADMIN }}:${{ env.DEPLOY_SHA }}
+          cache-from: type=gha,scope=admin
+          cache-to: type=gha,mode=max,scope=admin
+
+      - name: Check for an existing Partner image
+        id: partner-image
+        run: |
+          if aws ecr describe-images --repository-name "$ECR_REPOSITORY_PARTNER" --image-ids "imageTag=$DEPLOY_SHA" >/dev/null 2>&1; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push Partner
+        if: steps.partner-image.outputs.exists != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/docker/partner.Dockerfile
+          target: runtime
+          push: true
+          build-args: NEXT_PUBLIC_API_BASE_URL=${{ env.NEXT_PUBLIC_API_BASE_URL }}
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_PARTNER }}:${{ env.DEPLOY_SHA }}
+          cache-from: type=gha,scope=partner
+          cache-to: type=gha,mode=max,scope=partner
+
+      - name: Recheck branch head before deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const expected = process.env.DEPLOY_SHA;
+            const { data } = await github.rest.repos.getBranch({
+              owner: context.repo.owner, repo: context.repo.repo, branch: 'development_server'
+            });
+            if (data.commit.sha !== expected) {
+              core.setFailed(`Images were built, but deployment is stale: expected ${expected}, current head is ${data.commit.sha}`);
+            }
+
+      - name: Deploy through AWS Systems Manager
+        shell: bash
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          compose_b64="$(base64 -w 0 infrastructure/ci-cd/docker-compose.deploy.yml)"
+          deploy_b64="$(base64 -w 0 infrastructure/ci-cd/deploy.sh)"
+          rollback_b64="$(base64 -w 0 infrastructure/ci-cd/rollback.sh)"
+          quote() { printf '%q' "$1"; }
+          install_cmd="install -d -m 0750 $(quote "$DEPLOY_PATH")"
+          compose_cmd="printf %s $(quote "$compose_b64") | base64 -d > $(quote "$DEPLOY_PATH/docker-compose.deploy.yml.tmp") && mv $(quote "$DEPLOY_PATH/docker-compose.deploy.yml.tmp") $(quote "$DEPLOY_PATH/docker-compose.deploy.yml")"
+          deploy_asset_cmd="printf %s $(quote "$deploy_b64") | base64 -d > $(quote "$DEPLOY_PATH/deploy.sh.tmp") && mv $(quote "$DEPLOY_PATH/deploy.sh.tmp") $(quote "$DEPLOY_PATH/deploy.sh") && chmod 0750 $(quote "$DEPLOY_PATH/deploy.sh")"
+          rollback_asset_cmd="printf %s $(quote "$rollback_b64") | base64 -d > $(quote "$DEPLOY_PATH/rollback.sh.tmp") && mv $(quote "$DEPLOY_PATH/rollback.sh.tmp") $(quote "$DEPLOY_PATH/rollback.sh") && chmod 0750 $(quote "$DEPLOY_PATH/rollback.sh")"
+          deploy_cmd="cd $(quote "$DEPLOY_PATH") && env AWS_REGION=$(quote "$AWS_REGION") ECR_REGISTRY=$(quote "$ECR_REGISTRY") ECR_REPOSITORY_BACKEND=$(quote "$ECR_REPOSITORY_BACKEND") ECR_REPOSITORY_ADMIN=$(quote "$ECR_REPOSITORY_ADMIN") ECR_REPOSITORY_PARTNER=$(quote "$ECR_REPOSITORY_PARTNER") GYMRIDE_NETWORK=$(quote "${GYMRIDE_NETWORK:-gymride_gymride}") BACKEND_HEALTH_URL=$(quote "$BACKEND_HEALTH_URL") ADMIN_HEALTH_URL=$(quote "$ADMIN_HEALTH_URL") PARTNER_HEALTH_URL=$(quote "$PARTNER_HEALTH_URL") ./deploy.sh $(quote "$DEPLOY_SHA")"
+          parameters="$(jq -cn --arg c1 'set -eu' --arg c2 "$install_cmd" --arg c3 "$compose_cmd" --arg c4 "$deploy_asset_cmd" --arg c5 "$rollback_asset_cmd" --arg c6 "$deploy_cmd" '{commands: [$c1, $c2, $c3, $c4, $c5, $c6], executionTimeout: ["2400"]}')"
+          command_id="$(aws ssm send-command --instance-ids "$EC2_INSTANCE_ID" --document-name AWS-RunShellScript --comment "Deploy GymRide ${DEPLOY_SHA}" --parameters "$parameters" --timeout-seconds 2400 --query 'Command.CommandId' --output text)"
+          echo "SSM command: ${command_id}"
+          set +e
+          aws ssm wait command-executed --command-id "$command_id" --instance-id "$EC2_INSTANCE_ID"
+          wait_status=$?
+          set -e
+          invocation="$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$EC2_INSTANCE_ID" --output json)"
+          echo "$invocation" | jq -r '.StandardOutputContent'
+          echo "$invocation" | jq -r '.StandardErrorContent' >&2
+          status="$(echo "$invocation" | jq -r '.Status')"
+          [[ "$wait_status" -eq 0 && "$status" == "Success" ]] || { echo "Deployment failed with SSM status: ${status}" >&2; exit 1; }
+
+      - name: Publish deployment summary
+        if: always()
+        run: |
+          {
+            echo '## GymRide development deployment'
+            echo
+            echo "- Commit: \`${DEPLOY_SHA}\`"
+            echo "- CI run: [${{ github.event.workflow_run.id }}](${{ github.event.workflow_run.html_url }})"
+            echo "- Result: **${{ job.status }}**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  rollback:
+    name: Roll back application images
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: development
+    env:
+      ROLLBACK_SHA: ${{ inputs.rollback_sha }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      ECR_REPOSITORY_BACKEND: ${{ vars.ECR_REPOSITORY_BACKEND }}
+      ECR_REPOSITORY_ADMIN: ${{ vars.ECR_REPOSITORY_ADMIN }}
+      ECR_REPOSITORY_PARTNER: ${{ vars.ECR_REPOSITORY_PARTNER }}
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      GYMRIDE_NETWORK: ${{ vars.GYMRIDE_NETWORK }}
+      BACKEND_HEALTH_URL: ${{ vars.BACKEND_HEALTH_URL }}
+      ADMIN_HEALTH_URL: ${{ vars.ADMIN_HEALTH_URL }}
+      PARTNER_HEALTH_URL: ${{ vars.PARTNER_HEALTH_URL }}
+
+    steps:
+      - name: Validate rollback request
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$ROLLBACK_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'rollback_sha must be a full lowercase commit SHA' >&2; exit 1; }
+          required=(AWS_REGION AWS_ROLE_ARN ECR_REPOSITORY_BACKEND ECR_REPOSITORY_ADMIN ECR_REPOSITORY_PARTNER EC2_INSTANCE_ID DEPLOY_PATH BACKEND_HEALTH_URL ADMIN_HEALTH_URL PARTNER_HEALTH_URL)
+          for name in "${required[@]}"; do
+            [[ -n "${!name:-}" ]] || { echo "Missing GitHub environment variable: ${name}" >&2; exit 1; }
+          done
+
+      - name: Configure AWS credentials with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve ECR registry
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Run rollback through AWS Systems Manager
+        shell: bash
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          quote() { printf '%q' "$1"; }
+          rollback_cmd="cd $(quote "$DEPLOY_PATH") && env AWS_REGION=$(quote "$AWS_REGION") ECR_REGISTRY=$(quote "$ECR_REGISTRY") ECR_REPOSITORY_BACKEND=$(quote "$ECR_REPOSITORY_BACKEND") ECR_REPOSITORY_ADMIN=$(quote "$ECR_REPOSITORY_ADMIN") ECR_REPOSITORY_PARTNER=$(quote "$ECR_REPOSITORY_PARTNER") GYMRIDE_NETWORK=$(quote "${GYMRIDE_NETWORK:-gymride_gymride}") BACKEND_HEALTH_URL=$(quote "$BACKEND_HEALTH_URL") ADMIN_HEALTH_URL=$(quote "$ADMIN_HEALTH_URL") PARTNER_HEALTH_URL=$(quote "$PARTNER_HEALTH_URL") ./rollback.sh $(quote "$ROLLBACK_SHA")"
+          parameters="$(jq -cn --arg command "$rollback_cmd" '{commands: ["set -eu", $command], executionTimeout: ["600"]}')"
+          command_id="$(aws ssm send-command --instance-ids "$EC2_INSTANCE_ID" --document-name AWS-RunShellScript --comment "Roll back GymRide to ${ROLLBACK_SHA}" --parameters "$parameters" --timeout-seconds 600 --query 'Command.CommandId' --output text)"
+          echo "SSM command: ${command_id}"
+          set +e
+          aws ssm wait command-executed --command-id "$command_id" --instance-id "$EC2_INSTANCE_ID"
+          wait_status=$?
+          set -e
+          invocation="$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$EC2_INSTANCE_ID" --output json)"
+          echo "$invocation" | jq -r '.StandardOutputContent'
+          echo "$invocation" | jq -r '.StandardErrorContent' >&2
+          status="$(echo "$invocation" | jq -r '.Status')"
+          [[ "$wait_status" -eq 0 && "$status" == "Success" ]] || { echo "Rollback failed with SSM status: ${status}" >&2; exit 1; }
+
+      - name: Publish rollback summary
+        if: always()
+        run: |
+          {
+            echo '## GymRide development rollback'
+            echo
+            echo "- Requested commit: \`${ROLLBACK_SHA}\`"
+            echo "- Result: **${{ job.status }}**"
+            echo '- Database migrations were not reversed.'
+          } >> "$GITHUB_STEP_SUMMARY"

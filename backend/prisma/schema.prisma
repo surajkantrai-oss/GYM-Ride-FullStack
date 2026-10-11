@@ -185,6 +185,11 @@ enum GymOsAttendanceQrStatus {
   REVOKED
 }
 
+enum GymImageKind {
+  COVER
+  GALLERY
+}
+
 enum GymOsPlanStatus {
   DRAFT
   ACTIVE
@@ -437,6 +442,9 @@ model User {
   email                   String?                  @unique @db.VarChar(320)
   phone                   String?                  @unique @db.VarChar(32)
   passwordHash            String?                  @map("password_hash") @db.VarChar(255)
+  profilePhotoData        Bytes?                   @map("profile_photo_data")
+  profilePhotoMimeType    String?                  @map("profile_photo_mime_type") @db.VarChar(80)
+  profilePhotoUpdatedAt   DateTime?                @map("profile_photo_updated_at") @db.Timestamptz(6)
   status                  UserStatus               @default(PENDING)
   createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -549,10 +557,28 @@ model Gym {
   gymOsReminderDeliveries GymOsReminderDelivery[]
   gymOsCommunicationPreferences GymOsMemberCommunicationPreference[]
   gymOsReminderCampaigns GymOsReminderCampaign[]
+  images               GymImage[]
 
   @@index([ownerId])
   @@index([status])
   @@map("gyms")
+}
+
+model GymImage {
+  id        String       @id @default(uuid()) @db.Uuid
+  gymId     String       @map("gym_id") @db.Uuid
+  kind      GymImageKind @default(GALLERY)
+  sortOrder Int          @default(0) @map("sort_order")
+  mimeType  String       @map("mime_type") @db.VarChar(80)
+  data      Bytes
+  width     Int
+  height    Int
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gym       Gym          @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@index([gymId, kind, sortOrder])
+  @@map("gym_images")
 }
 
 model GymMember {

@@ -55,6 +55,7 @@ export function ExploreScreen() {
             name: g.gymName,
             description: `${g.branch.name} · ${g.branch.city} · ${(g.distanceMeters / 1000).toFixed(1)} km`,
             amenities: g.amenities.join(" · "),
+            imageId: g.coverImage?.id,
           })),
           next: data.meta.hasMore ? pageParam + 1 : undefined,
         };
@@ -77,6 +78,7 @@ export function ExploreScreen() {
             .map((b) => `${b.name}, ${b.city}`)
             .join(" · "),
           amenities: "",
+          imageId: g.images?.find((image) => image.kind === "COVER")?.id,
         })),
         next: data.meta.hasNextPage ? pageParam + 1 : undefined,
       };
@@ -258,7 +260,7 @@ export function ExploreScreen() {
             name={item.name}
             meta={item.description}
             detail={item.amenities || "Plans available"}
-            image={gymVisual(item.gymId)}
+            image={gymVisual(item.gymId, item.imageId)}
             onPress={() => navigation.navigate("Gym", { gymId: item.gymId })}
           />
         )}

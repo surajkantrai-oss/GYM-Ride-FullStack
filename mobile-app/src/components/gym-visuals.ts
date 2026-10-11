@@ -10,7 +10,11 @@ const visuals: ImageSourcePropType[] = [
   require("../../assets/gyms/gym-airy.jpg"),
 ];
 
-export function gymVisual(key: string): ImageSourcePropType {
+export function gymVisual(key: string, imageId?: string): ImageSourcePropType {
+  if (imageId && process.env.EXPO_PUBLIC_API_BASE_URL)
+    return {
+      uri: `${process.env.EXPO_PUBLIC_API_BASE_URL}/media/gym-images/${imageId}`,
+    };
   const total = [...key].reduce(
     (sum, character) => sum + character.charCodeAt(0),
     0,
@@ -19,4 +23,8 @@ export function gymVisual(key: string): ImageSourcePropType {
 }
 
 export const heroVisual = visuals[0]!;
-export const onboardingVisuals = [visuals[2]!, visuals[1]!, visuals[0]!] as const;
+export const onboardingVisuals = [
+  visuals[2]!,
+  visuals[1]!,
+  visuals[0]!,
+] as const;

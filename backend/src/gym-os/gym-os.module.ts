@@ -17,6 +17,7 @@ import {
 import { GymOsMembershipService } from './gym-os-membership.service';
 import {
   AdminGymOsAttendanceController,
+  CustomerGymOsAttendanceController,
   PartnerGymOsAttendanceController,
   PartnerGymOsMemberAttendanceController,
 } from './gym-os-attendance.controller';
@@ -44,6 +45,7 @@ import { GymOsReminderJobsService } from './gym-os-reminder-jobs.service';
     PartnerGymOsAttendanceController,
     PartnerGymOsMemberAttendanceController,
     AdminGymOsAttendanceController,
+    CustomerGymOsAttendanceController,
     PartnerGymOsMemberFinanceController,
     AdminGymOsMemberFinanceController,
     PartnerGymOsAnalyticsReminderController,

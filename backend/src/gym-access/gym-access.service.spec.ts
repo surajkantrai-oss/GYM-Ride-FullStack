@@ -27,6 +27,29 @@ describe('GymAccessService ownership', () => {
       status: 404,
     });
   });
+  it('allows a platform admin to use gym-scoped GymOS write services', async () => {
+    const service = new GymAccessService({
+      gym: { findUnique: jest.fn().mockResolvedValue({ ownerId: 'owner-a' }) },
+    } as never);
+    await expect(
+      service.assertGymOsMemberWrite(
+        { id: 'admin-a', roles: [RoleName.ADMIN], sessionId: 'session' },
+        'gym-a',
+      ),
+    ).resolves.toBeUndefined();
+  });
+  it('does not let an unrelated partner write another gym GymOS data', async () => {
+    const service = new GymAccessService({
+      gym: { findUnique: jest.fn().mockResolvedValue({ ownerId: 'owner-a' }) },
+      gymMembership: { findFirst: jest.fn().mockResolvedValue(null) },
+    } as never);
+    await expect(
+      service.assertGymOsMemberWrite(
+        { id: 'manager-b', roles: [RoleName.GYM_MANAGER], sessionId: 'session' },
+        'gym-a',
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+  });
   it('allows active branch-scoped staff to verify only their branch', async () => {
     const membership = {
       findFirst: jest.fn().mockResolvedValueOnce({ id: 'membership' }).mockResolvedValueOnce(null),

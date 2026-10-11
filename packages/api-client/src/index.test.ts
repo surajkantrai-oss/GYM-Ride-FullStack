@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiClient,
   ApiError,
+  createUuid,
   createGymRideApi,
   type TokenStore,
 } from "./index";
+
+afterEach(() => vi.unstubAllGlobals());
 
 const response = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -25,7 +28,62 @@ const store = (): TokenStore & { token: string | null } => ({
   },
 });
 
+describe("createUuid", () => {
+  it("prefers the native randomUUID implementation", () => {
+    const randomUUID = vi
+      .fn()
+      .mockReturnValue("123e4567-e89b-42d3-a456-426614174000");
+    const getRandomValues = vi.fn();
+    vi.stubGlobal("crypto", { randomUUID, getRandomValues });
+
+    expect(createUuid()).toBe("123e4567-e89b-42d3-a456-426614174000");
+    expect(randomUUID).toHaveBeenCalledOnce();
+    expect(getRandomValues).not.toHaveBeenCalled();
+  });
+
+  it("creates a secure RFC 4122 version 4 UUID when randomUUID is unavailable", () => {
+    const getRandomValues = vi.fn((bytes: Uint8Array) => {
+      bytes.forEach((_, index) => (bytes[index] = index));
+      return bytes;
+    });
+    vi.stubGlobal("crypto", { getRandomValues });
+
+    expect(createUuid()).toBe("00010203-0405-4607-8809-0a0b0c0d0e0f");
+    expect(getRandomValues).toHaveBeenCalledOnce();
+  });
+});
+
 describe("ApiClient", () => {
+  it.each(["Admin", "Partner"])(
+    "%s OTP requests use the UUID fallback without throwing",
+    async () => {
+      vi.stubGlobal("crypto", {
+        getRandomValues: (bytes: Uint8Array) => {
+          bytes.fill(7);
+          return bytes;
+        },
+      });
+      const fetcher = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+        Promise.resolve(response(200, {})),
+      );
+      const client = new ApiClient("https://api.test", {
+        tokenStore: store(),
+        fetcher,
+      });
+
+      await expect(
+        client.request("/auth/otp/request", {
+          method: "POST",
+          body: JSON.stringify({ phone: "+919876543210" }),
+        }),
+      ).resolves.toEqual({});
+      const headers = fetcher.mock.calls[0]?.[1]?.headers as Headers;
+      expect(headers.get("x-request-id")).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+    },
+  );
+
   it("normalizes backend errors", async () => {
     const client = new ApiClient("https://api.test", {
       tokenStore: store(),
