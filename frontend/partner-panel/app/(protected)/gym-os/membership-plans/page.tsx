@@ -15,16 +15,15 @@ import {
   useAuth,
 } from "@gymride/web-ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FormEvent, useState } from "react";
+import { FormEvent } from "react";
 import { api } from "@/lib/api";
+import { canManageGymOsMembers } from "@/lib/gym-os";
+import { useSelectedGym } from "@/lib/selected-gym";
 
 export default function MembershipPlansPage() {
   const cache = useQueryClient();
   const { user } = useAuth();
-  const [gymId, setGymId] = useState("");
-  const canWrite = !!user?.roles.some(
-    (role) => role === "GYM_OWNER" || role === "GYM_MANAGER",
-  );
+  const canWrite = canManageGymOsMembers(user?.roles ?? []);
   const gyms = useQuery({
     queryKey: ["membership-plan-gyms"],
     queryFn: () =>
@@ -32,7 +31,7 @@ export default function MembershipPlansPage() {
         "/partner/gyms?page=1&limit=100",
       ),
   });
-  const selectedGym = gymId || gyms.data?.data[0]?.id || "";
+  const [selectedGym, setGymId] = useSelectedGym(gyms.data?.data);
   const plans = useQuery({
     queryKey: ["membership-plans", selectedGym],
     enabled: !!selectedGym,

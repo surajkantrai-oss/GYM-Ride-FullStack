@@ -9,7 +9,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
-import { api } from "@/lib/api";
+import { api, gymImageUrl } from "@/lib/api";
 function List() {
   const params = useSearchParams();
   const router = useRouter();
@@ -81,7 +81,7 @@ function List() {
                 <div
                   className="gym-card-image"
                   style={{
-                    backgroundImage: `url(/images/${["gym-warm.jpg", "gym-strength.jpg", "gym-airy.jpg"][index % 3]})`,
+                    backgroundImage: `url(${gym.images?.find((image) => image.kind === "COVER") ? gymImageUrl(gym.images.find((image) => image.kind === "COVER")!.id) : `/images/${["gym-warm.jpg", "gym-strength.jpg", "gym-airy.jpg"][index % 3]}`})`,
                   }}
                 >
                   <StatusBadge status={gym.status} />

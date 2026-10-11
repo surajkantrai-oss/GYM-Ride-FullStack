@@ -48,6 +48,7 @@ export interface AppEnvironment {
   GYMOS_REMINDER_QUEUE_ENABLED: boolean;
   GYMOS_ATTENDANCE_QR_TTL_SECONDS: number;
   GYMOS_ATTENDANCE_QR_RETENTION_HOURS: number;
+  MEDIA_UPLOAD_MAX_BYTES: number;
 }
 
 function text(value: unknown, fallback: string): string {
@@ -229,5 +230,6 @@ export function validateEnvironment(raw: Record<string, unknown>): AppEnvironmen
       'GYMOS_ATTENDANCE_QR_RETENTION_HOURS',
       24,
     ),
+    MEDIA_UPLOAD_MAX_BYTES: integer(raw.MEDIA_UPLOAD_MAX_BYTES, 'MEDIA_UPLOAD_MAX_BYTES', 8_388_608),
   };
 }

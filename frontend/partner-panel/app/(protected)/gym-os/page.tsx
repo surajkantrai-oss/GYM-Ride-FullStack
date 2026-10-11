@@ -15,9 +15,10 @@ import {
   useAuth,
 } from "@gymride/web-ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { api } from "@/lib/api";
 import { canManageGymOsBilling, hasGymOsAccess } from "@/lib/gym-os";
+import { useSelectedGym } from "@/lib/selected-gym";
 
 const money = (value: number, currency = "INR") =>
   new Intl.NumberFormat("en-IN", {
@@ -42,8 +43,7 @@ export default function GymOsPage() {
         "/partner/gyms?page=1&limit=100",
       ),
   });
-  const [selected, setSelected] = useState("");
-  const gymId = selected || gyms.data?.data[0]?.id || "";
+  const [gymId, setSelected] = useSelectedGym(gyms.data?.data);
   const plans = useQuery({
     queryKey: ["gymos-plans"],
     queryFn: () => api.request<GymOsPlan[]>("/partner/gym-os/plans"),
@@ -119,7 +119,8 @@ export default function GymOsPage() {
   const active = hasGymOsAccess(current?.status);
   const awaitingActivation =
     current?.status === "TRIALING" ||
-    (current?.status === "PENDING_PAYMENT" && current.payment?.status === "SUCCESS");
+    (current?.status === "PENDING_PAYMENT" &&
+      current.payment?.status === "SUCCESS");
   const attendance = useQuery({
     queryKey: ["gymos-overview-attendance", gymId],
     enabled: !!gymId && active,
@@ -250,8 +251,11 @@ export default function GymOsPage() {
               <strong>GymOS activation pending</strong>
               <p>
                 {current.planNameSnapshot} has been requested
-                {current.payment?.status === "SUCCESS" ? " and payment is verified" : " as a trial"}.
-                An Admin must activate it before protected GymOS modules unlock.
+                {current.payment?.status === "SUCCESS"
+                  ? " and payment is verified"
+                  : " as a trial"}
+                . An Admin must activate it before protected GymOS modules
+                unlock.
               </p>
             </section>
           )}
@@ -303,7 +307,9 @@ export default function GymOsPage() {
                     ))}
                   </div>
                   <button
-                    disabled={!canBill || subscribe.isPending || awaitingActivation}
+                    disabled={
+                      !canBill || subscribe.isPending || awaitingActivation
+                    }
                     onClick={() => subscribe.mutate(plan.id)}
                   >
                     {awaitingActivation

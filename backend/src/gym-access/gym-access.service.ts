@@ -57,7 +57,7 @@ export class GymAccessService {
   async assertGymOsMemberWrite(user: AuthUser, gymId: string): Promise<void> {
     const gym = await this.prisma.gym.findUnique({ where: { id: gymId }, select: { ownerId: true } });
     if (!gym) this.gymNotFound();
-    if (gym.ownerId === user.id) return;
+    if (this.isAdmin(user) || gym.ownerId === user.id) return;
     const membership = await this.prisma.gymMembership.findFirst({
       where: { userId: user.id, gymId, status: MembershipStatus.ACTIVE, role: GymMembershipRole.MANAGER },
       select: { id: true },

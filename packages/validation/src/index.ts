@@ -1,12 +1,13 @@
 import type { OperatingHoursPeriod } from "@gymride/types";
+import { isValidPhoneNumber } from "libphonenumber-js";
 import { z } from "zod";
 
 const internationalPhoneSchema = z
   .string()
   .trim()
-  .regex(
-    /^\+[1-9]\d{7,14}$/,
-    "Use international format, for example +919876543210",
+  .refine(
+    (value) => /^\+[1-9]\d{7,14}$/.test(value) && isValidPhoneNumber(value),
+    "Enter a valid mobile number",
   );
 
 export const phoneSchema = z.object({ phone: internationalPhoneSchema });
@@ -56,7 +57,8 @@ export const branchSchema = z.object({
     .trim()
     .min(1, "Latitude is required")
     .refine(
-      (value) => Number.isFinite(Number(value)) && Math.abs(Number(value)) <= 90,
+      (value) =>
+        Number.isFinite(Number(value)) && Math.abs(Number(value)) <= 90,
       "Enter a latitude between -90 and 90",
     ),
   longitude: z

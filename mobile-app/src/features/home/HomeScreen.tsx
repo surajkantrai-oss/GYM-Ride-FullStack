@@ -143,7 +143,7 @@ export function HomeScreen() {
               <SectionTitle>Nearby gyms</SectionTitle>
               <State loading={nearby.isLoading} error={nearby.error} empty={nearby.data?.data.length === 0} retry={() => void nearby.refetch()} />
               {nearby.data?.data.map((gym) => (
-                <GymCard key={gym.branch.id} name={gym.gymName} meta={`${gym.branch.name} · ${(gym.distanceMeters / 1000).toFixed(1)} km`} detail="Near you" image={gymVisual(gym.gymId)} onPress={() => navigation.navigate("Gym", { gymId: gym.gymId })} />
+                <GymCard key={gym.branch.id} name={gym.gymName} meta={`${gym.branch.name} · ${(gym.distanceMeters / 1000).toFixed(1)} km`} detail="Near you" image={gymVisual(gym.gymId, gym.coverImage?.id)} onPress={() => navigation.navigate("Gym", { gymId: gym.gymId })} />
               ))}
             </View>
           )}
@@ -159,7 +159,7 @@ export function HomeScreen() {
             <SectionTitle>Discover gyms</SectionTitle>
             <State loading={query.isLoading} error={query.error} empty={query.data?.data.length === 0} retry={() => void query.refetch()} />
             {query.data?.data.map((gym) => (
-              <GymCard key={gym.id} name={gym.name} meta={gym.branches?.[0] ? `${gym.branches[0].name} · ${gym.branches[0].city}` : "Explore available branches"} detail={gym.description || "Plans and availability"} image={gymVisual(gym.id)} onPress={() => navigation.navigate("Gym", { gymId: gym.id })} />
+              <GymCard key={gym.id} name={gym.name} meta={gym.branches?.[0] ? `${gym.branches[0].name} · ${gym.branches[0].city}` : "Explore available branches"} detail={gym.description || "Plans and availability"} image={gymVisual(gym.id, gym.images?.find((image) => image.kind === "COVER")?.id)} onPress={() => navigation.navigate("Gym", { gymId: gym.id })} />
             ))}
           </View>
         </ScrollView>

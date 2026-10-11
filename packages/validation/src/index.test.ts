@@ -6,7 +6,18 @@ import {
   rupeesToMinor,
   slotConfigSchema,
   validateOperatingHours,
+  phoneSchema,
 } from "./index";
+
+describe("phoneSchema", () => {
+  it("accepts normalized E.164 numbers and rejects merely plausible digit strings", () => {
+    expect(phoneSchema.safeParse({ phone: "+919876543210" }).success).toBe(
+      true,
+    );
+    expect(phoneSchema.safeParse({ phone: "+911234" }).success).toBe(false);
+    expect(phoneSchema.safeParse({ phone: "9876543210" }).success).toBe(false);
+  });
+});
 
 describe("branchSchema", () => {
   const validBranch = {

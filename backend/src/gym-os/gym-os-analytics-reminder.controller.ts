@@ -41,7 +41,13 @@ import { GymOsReminderCampaignService } from './gym-os-reminder-campaign.service
 @ApiResponse({ status: 404, description: 'Gym-scoped resource not found' })
 @ApiResponse({ status: 429, description: 'Stable reminder rate limit exceeded' })
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.GYM_STAFF)
+@Roles(
+  RoleName.GYM_OWNER,
+  RoleName.GYM_MANAGER,
+  RoleName.GYM_STAFF,
+  RoleName.ADMIN,
+  RoleName.SUPER_ADMIN,
+)
 @Controller('partner/gyms/:gymId/gym-os')
 export class PartnerGymOsAnalyticsReminderController {
   constructor(

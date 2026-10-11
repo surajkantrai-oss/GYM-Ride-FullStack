@@ -21,6 +21,9 @@ export class AttendanceCheckInDto {
 export class AttendanceQrCheckInDto extends AttendanceCheckInDto {
   @ApiProperty() @IsString() @Length(20, 500) token!: string;
 }
+export class CustomerAttendanceQrCheckInDto {
+  @ApiProperty() @IsString() @Length(20, 500) token!: string;
+}
 export class AttendanceListDto {
   @ApiPropertyOptional() @IsOptional() @IsString() search?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() branchId?: string;

@@ -83,6 +83,38 @@ export class GymOsAttendanceService {
     return this.createAttendance(user, gymId, dto, GymOsAttendanceMethod.QR, token.id);
   }
 
+  async customerQrCheckIn(user: AuthUser, rawToken: string) {
+    const [id, secret] = rawToken.split('.');
+    if (!id || !secret)
+      this.fail(ApiErrorCode.GYMOS_ATTENDANCE_QR_INVALID, 'Invalid attendance QR', HttpStatus.BAD_REQUEST);
+    const token = await this.prisma.gymOsAttendanceQrToken.findUnique({ where: { id } });
+    if (!token || !this.matchesHash(token.tokenHash, secret))
+      this.fail(ApiErrorCode.GYMOS_ATTENDANCE_QR_INVALID, 'Invalid attendance QR', HttpStatus.BAD_REQUEST);
+    if (token.status === 'REVOKED')
+      this.fail(ApiErrorCode.GYMOS_ATTENDANCE_QR_REVOKED, 'Attendance QR was revoked', HttpStatus.CONFLICT);
+    if (token.expiresAt <= new Date())
+      this.fail(ApiErrorCode.GYMOS_ATTENDANCE_QR_EXPIRED, 'Attendance QR expired', HttpStatus.GONE);
+    await this.requireFeature(token.gymId);
+    await this.memberships.reconcile(token.gymId);
+    const member = await this.prisma.gymMember.findFirst({
+      where: { gymId: token.gymId, userId: user.id, status: GymMemberStatus.ACTIVE },
+      select: { id: true },
+    });
+    if (!member)
+      this.fail(
+        ApiErrorCode.GYMOS_ATTENDANCE_MEMBER_NOT_FOUND,
+        'Your account is not linked to an active member at this gym',
+        HttpStatus.FORBIDDEN,
+      );
+    return this.createAttendance(
+      user,
+      token.gymId,
+      { memberId: member.id, branchId: token.branchId },
+      GymOsAttendanceMethod.QR,
+      token.id,
+    );
+  }
+
   async checkOut(user: AuthUser, gymId: string, attendanceId: string) {
     await this.access.assertGymOsMemberRead(user, gymId);
     await this.requireFeature(gymId);

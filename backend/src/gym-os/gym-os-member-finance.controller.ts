@@ -11,7 +11,13 @@ import { MemberFinanceListDto, RecordMemberPaymentDto, ReverseMemberPaymentDto }
 import { GymOsMemberFinanceService } from './gym-os-member-finance.service';
 
 @ApiTags('Partner GymOS Member Finance') @ApiBearerAuth() @UseGuards(JwtAuthGuard,RolesGuard)
-@Roles(RoleName.GYM_OWNER,RoleName.GYM_MANAGER,RoleName.GYM_STAFF)
+@Roles(
+  RoleName.GYM_OWNER,
+  RoleName.GYM_MANAGER,
+  RoleName.GYM_STAFF,
+  RoleName.ADMIN,
+  RoleName.SUPER_ADMIN,
+)
 @Controller('partner/gyms/:gymId/gym-os')
 export class PartnerGymOsMemberFinanceController {
  constructor(private readonly service:GymOsMemberFinanceService){}

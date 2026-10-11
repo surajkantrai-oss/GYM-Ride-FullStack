@@ -11,7 +11,13 @@ import { AdminGymOsMemberListDto, CreateGymOsMemberDto, GymOsMemberImportDto, Gy
 import { GymOsMemberService } from './gym-os-member.service';
 
 @ApiTags('Partner GymOS Members') @ApiBearerAuth() @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.GYM_STAFF)
+@Roles(
+  RoleName.GYM_OWNER,
+  RoleName.GYM_MANAGER,
+  RoleName.GYM_STAFF,
+  RoleName.ADMIN,
+  RoleName.SUPER_ADMIN,
+)
 @Controller('partner/gyms/:gymId/gym-os/members')
 export class PartnerGymOsMemberController {
   constructor(private readonly members: GymOsMemberService) {}

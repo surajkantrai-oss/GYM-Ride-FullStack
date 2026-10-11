@@ -12,22 +12,24 @@ import {
   PageHeader,
   PageState,
   StatusBadge,
+  errorMessage,
   pushToast,
 } from "@gymride/web-ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { attendanceDateFrom } from "@/lib/gym-os";
+import { useSelectedGym } from "@/lib/selected-gym";
 export default function AttendancePage() {
   const cache = useQueryClient(),
-    [gymId, setGymId] = useState(""),
     [branchId, setBranchId] = useState(""),
     [search, setSearch] = useState(""),
     [historySearch, setHistorySearch] = useState(""),
     [method, setMethod] = useState(""),
     [range, setRange] = useState("TODAY"),
     [secondsLeft, setSecondsLeft] = useState(0),
-    [qrImage, setQrImage] = useState("");
+    [qrImage, setQrImage] = useState(""),
+    [qrRenderError, setQrRenderError] = useState("");
   const gyms = useQuery({
     queryKey: ["attendance-gyms"],
     queryFn: () =>
@@ -35,7 +37,7 @@ export default function AttendancePage() {
         "/partner/gyms?page=1&limit=100",
       ),
   });
-  const gym = gymId || gyms.data?.data[0]?.id || "";
+  const [gym, setGymId] = useSelectedGym(gyms.data?.data);
   const branches = useQuery({
     queryKey: ["attendance-branches", gym],
     enabled: !!gym,
@@ -62,13 +64,9 @@ export default function AttendancePage() {
     queryKey: ["attendance-history", gym, branch, historySearch, method, range],
     enabled: !!gym,
     queryFn: () => {
-      const from = attendanceDateFrom(
-        range as "TODAY" | "7_DAYS" | "30_DAYS",
-      );
-      return (
-      api.request<PaginatedResponse<GymOsAttendance>>(
-          `/partner/gyms/${gym}/gym-os/attendance?page=1&pageSize=100&dateFrom=${from}${branch ? `&branchId=${branch}` : ""}${method ? `&method=${method}` : ""}${historySearch ? `&search=${encodeURIComponent(historySearch)}` : ""}`,
-        )
+      const from = attendanceDateFrom(range as "TODAY" | "7_DAYS" | "30_DAYS");
+      return api.request<PaginatedResponse<GymOsAttendance>>(
+        `/partner/gyms/${gym}/gym-os/attendance?page=1&pageSize=100&dateFrom=${from}${branch ? `&branchId=${branch}` : ""}${method ? `&method=${method}` : ""}${historySearch ? `&search=${encodeURIComponent(historySearch)}` : ""}`,
       );
     },
   });
@@ -100,18 +98,37 @@ export default function AttendancePage() {
       pushToast("Checked in", "Attendance session opened.");
       await refresh();
     },
+    onError: (error) => pushToast("Check-in failed", errorMessage(error)),
   });
   const checkOut = useMutation({
     mutationFn: (id: string) =>
       api.request(`/partner/gyms/${gym}/gym-os/attendance/${id}/check-out`, {
         method: "POST",
       }),
-    onSuccess: refresh,
+    onSuccess: async () => {
+      pushToast("Checked out", "Attendance session closed.");
+      await refresh();
+    },
+    onError: (error) => pushToast("Check-out failed", errorMessage(error)),
   });
   const qr = useQuery({
     queryKey: ["attendance-qr", gym, branch],
     enabled: !!gym && !!branch,
-    refetchInterval: 45_000,
+    refetchInterval: (query) => {
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState !== "visible"
+      )
+        return false;
+      const expiresAt = query.state.data?.expiresAt;
+      if (!expiresAt) return false;
+      return Math.max(
+        5_000,
+        new Date(expiresAt).getTime() - Date.now() - 10_000,
+      );
+    },
+    refetchIntervalInBackground: false,
+    retry: false,
     queryFn: () =>
       api.request<{ token: string; expiresAt: string }>(
         `/partner/gyms/${gym}/gym-os/attendance/branches/${branch}/qr`,
@@ -120,27 +137,38 @@ export default function AttendancePage() {
   });
   useEffect(() => {
     const value = qr.data;
+    setQrImage("");
+    setQrRenderError("");
     if (!value) return;
     let active = true;
-    void import("qrcode").then(async (QRCode) => {
-      const image = await QRCode.toDataURL(value.token, {
-        width: 320,
-        margin: 2,
-        color: { dark: "#073c2d", light: "#fffdf7" },
-      });
-      if (active) setQrImage(image);
-    });
+    void import("qrcode")
+      .then((QRCode) =>
+        QRCode.toDataURL(value.token, {
+          width: 320,
+          margin: 2,
+          color: { dark: "#073c2d", light: "#fffdf7" },
+        }),
+      )
+      .then((image) => active && setQrImage(image))
+      .catch(
+        () => active && setQrRenderError("The QR image could not be rendered."),
+      );
     return () => {
       active = false;
     };
   }, [qr.data]);
   useEffect(() => {
-    if (!qr.data) return;
+    if (!qr.data) {
+      setSecondsLeft(0);
+      return;
+    }
     const update = () =>
       setSecondsLeft(
         Math.max(
           0,
-          Math.ceil((new Date(qr.data.expiresAt).getTime() - Date.now()) / 1000),
+          Math.ceil(
+            (new Date(qr.data.expiresAt).getTime() - Date.now()) / 1000,
+          ),
         ),
       );
     update();
@@ -173,6 +201,9 @@ export default function AttendancePage() {
           ))}
         </select>
         <select value={branch} onChange={(e) => setBranchId(e.target.value)}>
+          {!branches.data?.length && (
+            <option value="">No active branches</option>
+          )}
           {(branches.data || []).map((x) => (
             <option value={x.id} key={x.id}>
               {x.name}
@@ -205,7 +236,12 @@ export default function AttendancePage() {
                 <br />
                 <small>{m.memberCode}</small>
               </span>
-              <button onClick={() => checkIn.mutate(m.id)}>Check in</button>
+              <button
+                disabled={!branch || checkIn.isPending}
+                onClick={() => checkIn.mutate(m.id)}
+              >
+                {checkIn.isPending ? "Checking in…" : "Check in"}
+              </button>
             </div>
           ))}
         </article>
@@ -215,8 +251,21 @@ export default function AttendancePage() {
             {branches.data?.find((x) => x.id === branch)?.name} · refreshes
             automatically
           </p>
-          {qrImage ? (
+          {qr.error || qrRenderError ? (
+            <div className="qr-state">
+              <div className="error-banner" role="alert">
+                {qrRenderError || errorMessage(qr.error)}
+              </div>
+              <button
+                onClick={() => void qr.refetch()}
+                disabled={qr.isFetching}
+              >
+                {qr.isFetching ? "Retrying…" : "Retry QR"}
+              </button>
+            </div>
+          ) : qrImage ? (
             <img
+              className="attendance-qr"
               src={qrImage}
               width="280"
               height="280"
@@ -225,7 +274,13 @@ export default function AttendancePage() {
           ) : (
             <PageState title="Generating secure QR…" />
           )}
-          <p aria-live="polite">Expires in {secondsLeft} seconds</p>
+          {qr.data && (
+            <p aria-live="polite">
+              {secondsLeft > 0
+                ? `Expires in ${secondsLeft} seconds`
+                : "Refreshing expired QR…"}
+            </p>
+          )}
           <small>Front-desk fallback: search by member code or phone.</small>
         </article>
       </section>
@@ -235,8 +290,36 @@ export default function AttendancePage() {
           <PageState title="No members currently checked in" />
         ) : (
           <table>
-            <thead><tr><th>Member</th><th>Branch</th><th>Check-in</th><th>Plan</th><th>Duration</th><th>Action</th></tr></thead>
-            <tbody>{present.data.data.map((a) => <tr key={a.id}><td>{a.member?.firstName} {a.member?.lastName}<br/><small>{a.member?.memberCode}</small></td><td>{a.branch?.name}</td><td>{new Date(a.checkInAt).toLocaleString("en-IN")}</td><td>{a.membership?.planNameSnapshot}</td><td>{a.durationMinutes} min</td><td><button onClick={() => checkOut.mutate(a.id)}>Check out</button></td></tr>)}</tbody>
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Branch</th>
+                <th>Check-in</th>
+                <th>Plan</th>
+                <th>Duration</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {present.data.data.map((a) => (
+                <tr key={a.id}>
+                  <td>
+                    {a.member?.firstName} {a.member?.lastName}
+                    <br />
+                    <small>{a.member?.memberCode}</small>
+                  </td>
+                  <td>{a.branch?.name}</td>
+                  <td>{new Date(a.checkInAt).toLocaleString("en-IN")}</td>
+                  <td>{a.membership?.planNameSnapshot}</td>
+                  <td>{a.durationMinutes} min</td>
+                  <td>
+                    <button onClick={() => checkOut.mutate(a.id)}>
+                      Check out
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         )}
       </section>
@@ -248,9 +331,21 @@ export default function AttendancePage() {
         <section className="panel table-wrap">
           <h2>Attendance history</h2>
           <div className="filter-row">
-            <input value={historySearch} onChange={(e) => setHistorySearch(e.target.value)} placeholder="Name, phone or member code" />
-            <select value={range} onChange={(e) => setRange(e.target.value)}><option value="TODAY">Today</option><option value="7_DAYS">7 days</option><option value="30_DAYS">30 days</option></select>
-            <select value={method} onChange={(e) => setMethod(e.target.value)}><option value="">All methods</option><option value="MANUAL">Manual</option><option value="QR">QR</option></select>
+            <input
+              value={historySearch}
+              onChange={(e) => setHistorySearch(e.target.value)}
+              placeholder="Name, phone or member code"
+            />
+            <select value={range} onChange={(e) => setRange(e.target.value)}>
+              <option value="TODAY">Today</option>
+              <option value="7_DAYS">7 days</option>
+              <option value="30_DAYS">30 days</option>
+            </select>
+            <select value={method} onChange={(e) => setMethod(e.target.value)}>
+              <option value="">All methods</option>
+              <option value="MANUAL">Manual</option>
+              <option value="QR">QR</option>
+            </select>
           </div>
           <table>
             <thead>

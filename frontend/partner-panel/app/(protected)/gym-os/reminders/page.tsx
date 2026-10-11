@@ -17,22 +17,22 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { useSelectedGym } from "@/lib/selected-gym";
 export default function Reminders() {
   const { user } = useAuth(),
     write = !user?.roles.includes("GYM_STAFF"),
     cache = useQueryClient();
-  const [selected, setSelected] = useState(""),
-    [name, setName] = useState(""),
+  const [name, setName] = useState(""),
     [segment, setSegment] = useState("EXPIRING_IN_7_DAYS"),
     [scheduled, setScheduled] = useState("");
   const gyms = useQuery({
-      queryKey: ["reminder-gyms"],
-      queryFn: () =>
-        api.request<PaginatedResponse<GymSummary>>(
-          "/partner/gyms?page=1&limit=100",
-        ),
-    }),
-    gym = selected || gyms.data?.data[0]?.id || "";
+    queryKey: ["reminder-gyms"],
+    queryFn: () =>
+      api.request<PaginatedResponse<GymSummary>>(
+        "/partner/gyms?page=1&limit=100",
+      ),
+  });
+  const [gym, setSelected] = useSelectedGym(gyms.data?.data);
   const rules = useQuery({
       queryKey: ["reminder-rules", gym],
       enabled: !!gym,
@@ -245,14 +245,15 @@ export default function Reminders() {
                 <td>
                   <StatusBadge status={c.status} />
                 </td>
-                    <td>
-                      {c._count?.deliveries ?? 0}
-                      <br />
-                      <small>
-                        {c.deliverySummary?.sent ?? 0} sent · {c.deliverySummary?.skipped ?? 0}{' '}
-                        skipped · {c.deliverySummary?.failed ?? 0} failed
-                      </small>
-                    </td>
+                <td>
+                  {c._count?.deliveries ?? 0}
+                  <br />
+                  <small>
+                    {c.deliverySummary?.sent ?? 0} sent ·{" "}
+                    {c.deliverySummary?.skipped ?? 0} skipped ·{" "}
+                    {c.deliverySummary?.failed ?? 0} failed
+                  </small>
+                </td>
                 <td>
                   {c.status === "SCHEDULED" && (
                     <button
@@ -268,46 +269,48 @@ export default function Reminders() {
           </tbody>
         </table>
       </section>
-      <section className="panel table-wrap">
-        <h2>Delivery history</h2>
-        {history.error ? (
-          <ErrorState error={history.error} />
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Member</th>
-                <th>Reminder</th>
-                <th>Channel</th>
-                <th>Scheduled</th>
-                <th>Status</th>
-                <th>Attempts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.data?.items.map((d) => (
-                <tr key={d.id}>
-                  <td>
-                    {d.member?.firstName} {d.member?.lastName}
-                    <br />
-                    <small>{d.member?.memberCode}</small>
-                  </td>
-                  <td>{d.type.replaceAll("_", " ")}</td>
-                  <td>{d.channel}</td>
-                  <td>{new Date(d.scheduledFor).toLocaleString("en-IN")}</td>
-                  <td>
-                    <StatusBadge status={d.status} />
-                  </td>
-                  <td>
-                    {d.attemptCount}
-                    {d.lastErrorCode && <small> · {d.lastErrorCode}</small>}
-                  </td>
+      {!rules.error && (
+        <section className="panel table-wrap">
+          <h2>Delivery history</h2>
+          {history.error ? (
+            <ErrorState error={history.error} />
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Member</th>
+                  <th>Reminder</th>
+                  <th>Channel</th>
+                  <th>Scheduled</th>
+                  <th>Status</th>
+                  <th>Attempts</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+              </thead>
+              <tbody>
+                {history.data?.items.map((d) => (
+                  <tr key={d.id}>
+                    <td>
+                      {d.member?.firstName} {d.member?.lastName}
+                      <br />
+                      <small>{d.member?.memberCode}</small>
+                    </td>
+                    <td>{d.type.replaceAll("_", " ")}</td>
+                    <td>{d.channel}</td>
+                    <td>{new Date(d.scheduledFor).toLocaleString("en-IN")}</td>
+                    <td>
+                      <StatusBadge status={d.status} />
+                    </td>
+                    <td>
+                      {d.attemptCount}
+                      {d.lastErrorCode && <small> · {d.lastErrorCode}</small>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
     </>
   );
 }

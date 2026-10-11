@@ -29,7 +29,13 @@ import { GymOsMembershipService } from './gym-os-membership.service';
 @ApiTags('Partner GymOS Memberships')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.GYM_STAFF)
+@Roles(
+  RoleName.GYM_OWNER,
+  RoleName.GYM_MANAGER,
+  RoleName.GYM_STAFF,
+  RoleName.ADMIN,
+  RoleName.SUPER_ADMIN,
+)
 @Controller('partner/gyms/:gymId/gym-os')
 export class PartnerGymOsMembershipController {
   constructor(private readonly service: GymOsMembershipService) {}
@@ -40,7 +46,7 @@ export class PartnerGymOsMembershipController {
   }
   @Post('membership-plans')
   @ApiOperation({ summary: 'Create a draft membership plan' })
-  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER)
+  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.ADMIN, RoleName.SUPER_ADMIN)
   createPlan(
     @CurrentUser() u: AuthUser,
     @Param('gymId', ParseUUIDPipe) g: string,
@@ -59,7 +65,7 @@ export class PartnerGymOsMembershipController {
   @ApiOperation({
     summary: 'Edit a non-archived membership plan; existing snapshots stay immutable',
   })
-  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER)
+  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.ADMIN, RoleName.SUPER_ADMIN)
   updatePlan(
     @CurrentUser() u: AuthUser,
     @Param('gymId', ParseUUIDPipe) g: string,
@@ -70,7 +76,7 @@ export class PartnerGymOsMembershipController {
   }
   @Post('membership-plans/:planId/activate')
   @ApiOperation({ summary: 'Activate a membership plan' })
-  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER)
+  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.ADMIN, RoleName.SUPER_ADMIN)
   activate(
     @CurrentUser() u: AuthUser,
     @Param('gymId', ParseUUIDPipe) g: string,
@@ -80,7 +86,7 @@ export class PartnerGymOsMembershipController {
   }
   @Post('membership-plans/:planId/deactivate')
   @ApiOperation({ summary: 'Deactivate a membership plan' })
-  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER)
+  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.ADMIN, RoleName.SUPER_ADMIN)
   deactivate(
     @CurrentUser() u: AuthUser,
     @Param('gymId', ParseUUIDPipe) g: string,
@@ -90,7 +96,7 @@ export class PartnerGymOsMembershipController {
   }
   @Post('membership-plans/:planId/archive')
   @ApiOperation({ summary: 'Archive a membership plan without deleting history' })
-  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER)
+  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.ADMIN, RoleName.SUPER_ADMIN)
   archive(
     @CurrentUser() u: AuthUser,
     @Param('gymId', ParseUUIDPipe) g: string,
@@ -102,7 +108,7 @@ export class PartnerGymOsMembershipController {
   @ApiOperation({
     summary: 'Assign an active plan; dates, price, status and snapshots are server-derived',
   })
-  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER)
+  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.ADMIN, RoleName.SUPER_ADMIN)
   assign(
     @CurrentUser() u: AuthUser,
     @Param('gymId', ParseUUIDPipe) g: string,
@@ -151,7 +157,7 @@ export class PartnerGymOsMembershipController {
   }
   @Post('memberships/:membershipId/freeze')
   @ApiOperation({ summary: 'Freeze an active membership with a reason' })
-  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER)
+  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.ADMIN, RoleName.SUPER_ADMIN)
   freeze(
     @CurrentUser() u: AuthUser,
     @Param('gymId', ParseUUIDPipe) g: string,
@@ -162,7 +168,7 @@ export class PartnerGymOsMembershipController {
   }
   @Post('memberships/:membershipId/resume')
   @ApiOperation({ summary: 'Resume once and extend end date by frozen days' })
-  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER)
+  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.ADMIN, RoleName.SUPER_ADMIN)
   resume(
     @CurrentUser() u: AuthUser,
     @Param('gymId', ParseUUIDPipe) g: string,
@@ -172,7 +178,7 @@ export class PartnerGymOsMembershipController {
   }
   @Post('memberships/:membershipId/cancel')
   @ApiOperation({ summary: 'Cancel an open membership with a reason; no payment or refund occurs' })
-  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER)
+  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.ADMIN, RoleName.SUPER_ADMIN)
   cancel(
     @CurrentUser() u: AuthUser,
     @Param('gymId', ParseUUIDPipe) g: string,
@@ -183,7 +189,7 @@ export class PartnerGymOsMembershipController {
   }
   @Post('memberships/:membershipId/renew')
   @ApiOperation({ summary: 'Create one linked renewal period without collecting payment' })
-  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER)
+  @Roles(RoleName.GYM_OWNER, RoleName.GYM_MANAGER, RoleName.ADMIN, RoleName.SUPER_ADMIN)
   renew(
     @CurrentUser() u: AuthUser,
     @Param('gymId', ParseUUIDPipe) g: string,

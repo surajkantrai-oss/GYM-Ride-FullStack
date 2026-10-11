@@ -19,6 +19,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormEvent } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
+import { canManageGymOsMembers } from "@/lib/gym-os";
 export default function MemberDetailPage() {
   const { user } = useAuth();
   const { memberId } = useParams<{ memberId: string }>(),
@@ -154,9 +155,7 @@ export default function MemberDetailPage() {
   const current = memberships.data?.find((membership) =>
     ["ACTIVE", "FROZEN", "SCHEDULED"].includes(membership.status),
   );
-  const canWrite = !!user?.roles.some(
-    (role) => role === "GYM_OWNER" || role === "GYM_MANAGER",
-  );
+  const canWrite = canManageGymOsMembers(user?.roles ?? []);
   return (
     <>
       <PageHeader
